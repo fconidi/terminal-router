@@ -1,0 +1,21 @@
+<!DOCTYPE Menu PUBLIC "-//freedesktop//DTD Menu 1.0//EN"
+ "http://www.freedesktop.org/standards/menu-spec/1.0/menu.dtd">
+
+<!-- Adds Terminal Router to the SysLinuxOS Tools menu.
+     That menu includes entries by explicit filename, so a category cannot
+     reach it. This drop-in merges into it instead of patching
+     /etc/xdg/menus/mate-applications.menu, which belongs to mate-menus.
+     The Networking placement comes from the X-SysLinuxOS-Networking
+     category in the .desktop file and needs nothing here. -->
+
+<Menu>
+  <Name>Applications</Name>
+
+  <Menu>
+    <Name>SysLinuxOS Tools</Name>
+    <Include>
+      <Filename>terminal-router.desktop</Filename>
+    </Include>
+  </Menu>
+
+</Menu>

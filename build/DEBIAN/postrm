@@ -1,0 +1,19 @@
+#!/bin/bash
+set -e
+
+case "$1" in
+    remove|purge)
+        echo ""
+        echo "Terminal Router removed."
+        echo "If the menu entry remains visible, log out and back in to refresh"
+        echo "the MATE menu cache."
+        echo "Per-user configuration in each user's HOME is NOT touched by"
+        echo "package removal. Users who had it enabled should have run"
+        echo "'terminal-router remove' first; otherwise remove by hand the"
+        echo "blocks marked '# >>> claude-terminal-log >>>' from ~/.bashrc"
+        echo "and ~/.tmux.conf, the crontab line mentioning ~/.claude-logs,"
+        echo "and the ~/.claude-logs directory."
+        echo ""
+        ;;
+esac
+exit 0

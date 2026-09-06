@@ -1,0 +1,28 @@
+#!/bin/bash
+set -e
+
+case "$1" in
+    configure)
+        VERSION="1.0.6"
+        echo ""
+        echo "=================================================="
+        echo "  Terminal Router $VERSION installed"
+        echo "=================================================="
+        echo "  Nothing is logged yet. Each user opts in with:"
+        echo "    terminal-router install      every terminal (or the menu entry)"
+        echo "    terminal-router launch        one session only, no dotfile edits"
+        echo ""
+        echo "  Status:  terminal-router status"
+        echo "  Remove:  terminal-router remove"
+        echo "  Docs:    man terminal-router"
+        echo ""
+        echo "  Menu: Networking and SysLinuxOS Tools. MATE caches the menu;"
+        echo "  log out and back in if the entry does not appear yet."
+        echo ""
+        echo "  Note: logs capture screen output, including secrets passed"
+        echo "  as plaintext command-line arguments. Use logpause before"
+        echo "  sensitive work."
+        echo ""
+        ;;
+esac
+exit 0

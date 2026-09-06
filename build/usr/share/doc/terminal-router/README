@@ -1,0 +1,147 @@
+terminal-router
+===============
+
+Automatic logging of every interactive terminal session, so an AI assistant
+such as Claude Code can follow live work on a network device CLI in real time
+without any access to the device itself.
+
+The intended workflow: you open an SSH session to a Cisco or Huawei router in
+one pane, the assistant reads ~/.claude-logs/latest in another. You type, it
+reads and suggests, you decide what to run. The log never leaves the machine.
+
+
+How it works
+------------
+
+1. Every interactive terminal you open enters its own tmux session, via a
+   marked block added to ~/.bashrc (or ~/.zshrc).
+2. tmux hooks in ~/.tmux.conf intercept each new pane (session, window, split)
+   and pipe its output to a logger script.
+3. ~/.claude-logs/pipe-logger.sh writes a timestamped file per pane and keeps
+   the symlink ~/.claude-logs/latest pointing at the newest one.
+4. The assistant tails that symlink.
+
+"terminal-router launch" is a lighter alternative to the above: it starts one
+tmux session with the pipe-pane hooks set directly on that session (no -g),
+so they log only its own windows/splits and vanish when the session ends.
+Nothing is written to ~/.bashrc, ~/.zshrc or ~/.tmux.conf — every other
+terminal, Terminator tabs included, is unaffected. Use it when you want
+logging for a single router session without opting every terminal in.
+
+
+Files
+-----
+
+  ~/.bashrc (marked block)      auto-enter tmux on interactive terminals,
+                                plus the logpause / logresume functions
+  ~/.tmux.conf (marked block)   hooks that start logging on each new pane
+  ~/.claude-logs/               log directory, mode 0700
+  ~/.claude-logs/pipe-logger.sh the logger itself
+  ~/.claude-logs/tmux-<session>-<window>-<pane>-<timestamp>.log
+                                one file per pane, mode 0600
+  ~/.claude-logs/latest         symlink to the newest pane log
+  ~/.config/terminal-router/consent
+                                records that this user accepted the notice
+  user crontab                  nightly rotation, deletes logs over 30 days old
+
+The marked blocks are delimited by
+
+  # >>> claude-terminal-log >>>
+  ...
+  # <<< claude-terminal-log <<<
+
+Those markers keep the name of the standalone installer script this package
+replaces, so machines configured before packaging are recognised, updated and
+removed correctly. Nothing else in your dotfiles is touched.
+
+
+Commands
+--------
+
+  terminal-router install    set up the hooks for the current user (every terminal)
+  terminal-router launch     log a single session only, no dotfile edits
+  terminal-router remove     undo them (files backed up as *.terminal-router.bak)
+  terminal-router status     what is active, how much has been logged
+  terminal-router tail       follow the newest pane log
+  terminal-router menu       interactive menu, used by the desktop entry
+
+Inside a logged pane:
+
+  logpause      detach logging from this pane
+  logresume     resume, into a new file
+
+Everything is per-user and confined to $HOME. Never run these with sudo: as
+root they would configure /root instead of your account.
+
+
+Security
+--------
+
+The log captures everything that appears in the terminal.
+
+Passwords typed at an interactive prompt (sudo, SSH password authentication)
+are NOT captured: the tty does not echo them, so tmux pipe-pane never sees
+them.
+
+What IS captured is anything visible on screen, including:
+
+  - passwords passed as plaintext arguments, e.g. mysql -pXXX
+  - tokens in headers, e.g. curl -H "Authorization: Bearer XXX"
+  - export TOKEN=... typed in the clear
+  - the output of cat on a .env file or a private key
+
+Mitigations applied automatically:
+
+  - ~/.claude-logs is mode 0700, log files 0600, logger runs with umask 077
+  - nightly rotation deletes logs older than 30 days
+  - logpause / logresume kill-switch for sensitive work
+  - the directory sits outside any cloud-synced folder
+
+Remaining recommendations, not automated:
+
+  - prefer SSH key authentication over passwords
+  - run logpause before typing a secret as a command-line argument
+  - immediate manual cleanup: rm ~/.claude-logs/tmux-*.log
+
+Nothing is enabled by installing the package. Each user must opt in explicitly
+and acknowledge this notice once.
+
+install, launch and status also check whether claude or codex is on PATH and
+warn (without blocking) if neither is found, since the log they set up then
+has no AI assistant to read it. codex ships via nvm on some setups, so it is
+only found once the shell that sources nvm is the one running the check.
+
+
+Notes on Terminator
+-------------------
+
+Each Terminator tab or window opens an independent tmux session (auto-named
+0, 1, 2, ...), so tabs do not mirror each other.
+
+A Terminator split (Ctrl+Shift+O / Ctrl+Shift+E) starts bash again and thus
+creates yet another tmux session. It works, but it is redundant. Prefer tmux's
+own splits inside a single tab: Ctrl+b % (vertical), Ctrl+b " (horizontal),
+navigate with Ctrl+b and the arrow keys. They stay in one session and each pane
+is still logged separately.
+
+
+Troubleshooting
+---------------
+
+The terminal does not enter tmux automatically
+  It must be an interactive shell on a real tty. Scripts, cron jobs and tools
+  that do not allocate a terminal are skipped on purpose, to avoid noise.
+
+Several tabs show the same content
+  Those tabs attached to an existing session instead of creating a new one.
+  With the shipped block ("tmux new-session", without exec) this should not
+  happen; check that the block in ~/.bashrc has not been edited by hand.
+
+The log is empty, or latest does not exist
+  Check the hooks are loaded: tmux show-hooks -g | grep pipe-pane
+  If missing, ~/.tmux.conf was not read. Restart the tmux server with
+  tmux kill-server, then open a new terminal. That closes all tmux sessions.
+
+Removing the package does not undo the per-user setup
+  Correct: dpkg cannot safely edit every user's HOME. Run
+  terminal-router remove first, or clean the marked blocks by hand.
