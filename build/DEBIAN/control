@@ -1,0 +1,38 @@
+Package: terminal-router
+Version: 1.0.6
+Section: net
+Priority: optional
+Architecture: all
+Depends: bash, tmux
+Recommends: cron
+Suggests: terminator
+Maintainer: Franco Conidi aka edmond <fconidi@gmail.com>
+Homepage: https://www.syslinuxos.com
+Description: Terminal Router - tmux session recorder for AI-assisted router work
+ Records every interactive terminal session into a per-pane log file under
+ ~/.claude-logs, so an AI assistant such as Claude Code can follow a live
+ network device CLI session in real time by reading a single file.
+ .
+ The typical use case is an interactive SSH session on a Cisco or Huawei
+ router: the assistant has no access to the device and never needs any. The
+ operator types, the assistant reads the log and suggests, the operator
+ decides what to run.
+ .
+ Features:
+  - Every interactive terminal enters its own tmux session automatically
+  - "terminal-router launch" logs a single self-contained session instead,
+    with no ~/.bashrc, ~/.zshrc or ~/.tmux.conf edits at all
+  - status, install and launch warn if neither claude nor codex is on PATH,
+    since the log has no AI assistant to read it otherwise
+  - Each pane (session, window, split) is logged to its own timestamped file
+  - Stable ~/.claude-logs/latest symlink always points at the newest pane
+  - logpause / logresume kill-switch for sensitive work
+  - Strict permissions: directory 0700, log files 0600
+  - Automatic rotation: logs older than 30 days deleted nightly at 03:00
+  - Clean removal: terminal-router remove undoes every change, with backups
+ .
+ All configuration is per-user and confined to $HOME. Nothing is enabled at
+ install time: the user must explicitly opt in from the menu entry or with
+ "terminal-router install", after acknowledging that the log captures whatever
+ is printed on screen.
+Installed-Size: 140
