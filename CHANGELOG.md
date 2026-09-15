@@ -3,6 +3,19 @@
 All notable changes to this project are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.0.7] - 2026-09-15
+
+### Fixed
+- `remove`: fixed a crontab race where `crontab -l` was read twice (once to
+  check, once to filter) instead of once; a concurrent crontab edit between
+  the two reads could make the filter step overwrite the user's entire
+  crontab with an empty one. Now reads it once and reuses that snapshot for
+  both the check and the rewrite.
+- Packaging: corrected `debian/copyright`, which declared `GPL-3+` while the
+  project has always been MIT (see `LICENSE`).
+- Packaging: `changelog.gz` and the man page were stuck at 1.0.5 while the
+  package itself was already at 1.0.6; both now track the real version.
+
 ## [1.0.6] - 2026-09-06
 
 ### Fixed
