@@ -9,7 +9,7 @@
 
 set -uo pipefail
 
-VERSION="1.0.6"
+VERSION="1.0.7"
 MARK_BEGIN="# >>> claude-terminal-log >>>"
 MARK_END="# <<< claude-terminal-log <<<"
 SED_RANGE='/^# >>> claude-terminal-log >>>$/,/^# <<< claude-terminal-log <<<$/d'
@@ -176,9 +176,15 @@ cmd_remove() {
         fi
     done
 
-    if command -v crontab > /dev/null 2>&1 && crontab -l 2>/dev/null | grep -qF "$LOGDIR"; then
-        crontab -l 2>/dev/null | grep -vF "$LOGDIR" | crontab -
-        echo "OK    crontab rotation entry removed"
+    if command -v crontab > /dev/null 2>&1; then
+        local cron_list
+        cron_list=$(crontab -l 2>/dev/null || true)
+        if printf '%s\n' "$cron_list" | grep -qF "$LOGDIR"; then
+            printf '%s\n' "$cron_list" | grep -vF "$LOGDIR" | crontab -
+            echo "OK    crontab rotation entry removed"
+        else
+            echo "SKIP  crontab (no rotation entry)"
+        fi
     else
         echo "SKIP  crontab (no rotation entry)"
     fi
