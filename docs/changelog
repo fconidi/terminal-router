@@ -1,3 +1,10 @@
+terminal-router (1.1.1) tirreno; urgency=medium
+
+  * Read the installation banner version from dpkg instead of the stale 1.0.7.
+  * Clarify the upgrade notice and add a banner regression test.
+
+ -- Franco Conidi <fconidi@gmail.com>  Wed, 23 Sep 2026 22:00:00 +0200
+
 terminal-router (1.1.0) tirreno; urgency=medium
 
   * Add pane-level pause/resume and read-only doctor diagnostics.

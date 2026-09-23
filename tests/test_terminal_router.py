@@ -272,5 +272,22 @@ class RouterTests(unittest.TestCase):
                 proc.wait(timeout=5)
 
 
+class PackagingTests(unittest.TestCase):
+    def test_installation_banner_uses_configured_package_version(self):
+        with tempfile.TemporaryDirectory(prefix="terminal-router-postinst-") as directory:
+            query = Path(directory) / "dpkg-query"
+            query.write_text("#!/bin/sh\nprintf '%s\\n' \"$TEST_PACKAGE_VERSION\"\n")
+            query.chmod(0o755)
+            for version in ("1.1.0", "9.8.7"):
+                with self.subTest(version=version):
+                    env = dict(os.environ, PATH=f"{directory}:{os.environ['PATH']}",
+                               TEST_PACKAGE_VERSION=version,
+                               DPKG_MAINTSCRIPT_PACKAGE="terminal-router")
+                    result = subprocess.run(
+                        ["bash", str(ROOT / "build/DEBIAN/postinst"), "configure"],
+                        env=env, capture_output=True, text=True, check=True)
+                    self.assertIn(f"Terminal Router {version} installed", result.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()

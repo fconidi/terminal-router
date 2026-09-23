@@ -9,7 +9,7 @@
 
 set -uo pipefail
 
-VERSION="1.1.0"
+VERSION="1.1.1"
 INSTALLER="/usr/share/terminal-router/install.sh"
 CONSENT="$HOME/.config/terminal-router/consent"
 source /usr/share/terminal-router/common.sh || exit 1
