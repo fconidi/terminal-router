@@ -3,6 +3,14 @@
 All notable changes to this project are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.1.1] - 2026-09-23
+
+### Fixed
+- Installation banner reads the configured version from dpkg instead of showing
+  the hard-coded 1.0.7. A regression test checks current and future versions.
+- Installation notice now accounts for existing user setups during upgrades
+  and recommends the pause command available in both logging modes.
+
 ## [1.1.0] - 2026-09-23
 
 ### Added
