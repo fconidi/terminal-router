@@ -40,11 +40,22 @@ on screen. Never run these as root: they configure the calling user's
 | `terminal-router launch` | log a single session only, no dotfile edits |
 | `terminal-router remove` | undo them (files backed up as `*.terminal-router.bak`) |
 | `terminal-router status` | what's active, how much has been logged |
-| `terminal-router tail` | follow the newest pane log |
+| `terminal-router doctor` | diagnose setup, permissions and live panes without changes |
+| `terminal-router tail` | follow the newest pane log, switching when `latest` changes |
+| `terminal-router pause` | suspend capture in the calling tmux pane |
+| `terminal-router resume` | resume that pane into a new log |
 | `terminal-router menu` | interactive menu (used by the desktop entry) |
 
-Inside a logged pane: `logpause` detaches logging from that pane,
-`logresume` resumes it into a new file. Use them around sensitive work.
+Inside a logged pane, use `terminal-router pause` before sensitive work and
+`terminal-router resume` afterwards. These commands also work with `launch`.
+After `install`, `logpause` and `logresume` are shell shortcuts.
+Repeating `resume` while a pipe is active leaves it unchanged.
+Detaching with **Ctrl+b d does not stop logging**; pause first if needed.
+
+`doctor` returns 1 when it finds a setup or permission error, and 0 otherwise.
+Missing rotation or an idle tmux server are advisory warnings. A live pipe
+does not prove that output is reaching disk; inspect the log when diagnosing
+capture problems.
 
 ## Security
 
@@ -72,7 +83,7 @@ manually clean up with `rm ~/.claude-logs/tmux-*.log` when needed.
 
 ## Requirements
 
-`bash`, `tmux`. `cron` recommended (log rotation); `claude` and/or `codex`
+`bash`, `tmux >= 3.0`. `cron` recommended (log rotation); `claude` and/or `codex`
 on `PATH` so something actually reads the log — `install`/`launch`/`status`
 warn (without blocking) if neither is found.
 
@@ -87,6 +98,13 @@ bash build-deb.sh
 sudo apt install ./terminal-router_*_all.deb
 terminal-router install   # as your normal user, not root
 ```
+
+After upgrading from 1.0.x, re-run `terminal-router install` if you use the
+global setup. It updates only marked blocks, saves `*.terminal-router.bak`,
+and preserves surrounding settings. Existing tmux servers keep their loaded
+hooks: reload your config with `tmux source-file ~/.tmux.conf` and use
+`terminal-router pause` / `resume` in existing panes to replace old pipes.
+For one-shot use, start a fresh `terminal-router launch` session instead.
 
 ### SysLinuxOS
 
@@ -107,6 +125,27 @@ this repo with full commit history via `git subtree`:
 ```bash
 scripts/sync-from-monorepo.sh [path-to-syslinuxos-packages]
 ```
+
+The 1.1.0 changes were developed in this standalone repository; reconcile them
+with the monorepo before the next sync to avoid restoring older code.
+
+## Development checks
+
+Run as a normal user with Python 3 and tmux installed:
+
+```bash
+python3 -m unittest discover -s tests -v
+bash build-deb.sh
+```
+
+Tests isolate HOME and tmux sockets under `/tmp` and replace `crontab` with a
+temporary file. They exercise real tmux hooks and log output; attachment alone
+is stubbed so the suite can run without an interactive terminal.
+
+Hook arguments use tmux's shell-quoting modifier, as documented in the
+[tmux formats reference](https://github.com/tmux/tmux/wiki/Formats).
+The hook configuration syntax requires [tmux 3.0 or newer](https://github.com/tmux/tmux/blob/3.0/CHANGES).
+Further ideas and their acceptance criteria are in [ROADMAP.md](ROADMAP.md).
 
 ## License
 

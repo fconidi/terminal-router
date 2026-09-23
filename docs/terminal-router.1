@@ -1,0 +1,149 @@
+.TH TERMINAL-ROUTER 1 "September 2026" "terminal-router 1.1.0" "SysLinuxOS Manual"
+.SH NAME
+terminal\-router \- record tmux terminal sessions for AI\-assisted router work
+.SH SYNOPSIS
+.B terminal\-router
+.RI [ command ]
+.SH DESCRIPTION
+.B terminal\-router
+logs every interactive terminal session to a per\-pane file under
+.IR ~/.claude\-logs ,
+so an AI assistant such as Claude Code can follow live work on a network device
+CLI in real time by reading a single file.
+.PP
+The intended workflow is an interactive SSH session on a Cisco or Huawei
+router. The assistant has no access to the device and never needs any: the
+operator types, the assistant reads the log and suggests, the operator decides
+what to run.
+.PP
+All configuration is per\-user and confined to
+.IR $HOME .
+Nothing is enabled by installing the package; each user must opt in explicitly
+and acknowledge the security notice once.
+.PP
+.B install
+and
+.B launch
+warn, without blocking, if neither
+.B claude
+nor
+.B codex
+is found on PATH, since the log they set up then has no AI assistant to
+read it.
+.SH COMMANDS
+.TP
+.B install
+Set up the shell and tmux hooks for the calling user. Idempotent. Logs every
+interactive terminal.
+.TP
+.B launch
+Start one self\-contained, one\-off logged tmux session instead. No
+.I ~/.bashrc ,
+.I ~/.zshrc
+or
+.I ~/.tmux.conf
+edit is made: the hooks are set on that single session only and disappear
+with it, so every other terminal \(em Terminator included \(em is
+unaffected. Detach with Ctrl\-b d to fall back to a plain shell in the same
+window; logging continues while detached. Use pause to suspend capture.
+Exiting ends the session.
+.TP
+.B remove
+Undo them. The marked blocks are deleted from
+.I ~/.bashrc
+and
+.IR ~/.tmux.conf ,
+both Bash and Zsh startup files are checked, each backed up as
+.IR file .terminal\-router.bak ,
+the crontab rotation entry is dropped, and the log directory can optionally be
+deleted.
+.TP
+.B status
+Report which hooks are active, whether rotation is configured, whether
+.B claude
+or
+.B codex
+is on PATH to read the log, how many logs exist and which pane is current.
+.TP
+.B tail
+Follow the newest pane log, switching when the latest symlink changes.
+.TP
+.B pause
+Suspend capture in the calling tmux pane. Also available in launch sessions.
+.TP
+.B resume
+Resume capture in the calling pane into a new file. An already active pipe
+is left unchanged.
+.TP
+.B doctor
+Read-only checks for setup, permissions, latest log and live panes. Returns
+1 for detected errors and 0 otherwise; warnings alone do not cause failure.
+.TP
+.B menu
+Interactive menu. This is what the desktop entry runs.
+.TP
+.B help
+Show usage.
+.SH SHELL FUNCTIONS
+After install, shell shortcuts delegate to the pause and resume commands.
+Inside a logged pane,
+.B logpause
+detaches logging from that pane and
+.B logresume
+resumes it into a new file. Use them around sensitive work.
+.SH FILES
+.TP
+.I ~/.bashrc
+Marked block that enters tmux on interactive terminals and defines
+logpause/logresume. Uses
+.I ~/.zshrc
+when the login shell is zsh.
+.TP
+.I ~/.tmux.conf
+Marked block with the pipe\-pane hooks.
+.TP
+.I ~/.claude-logs/
+Log directory, mode 0700. Contains one 0600 file per pane and the symlink
+.I latest
+pointing at the newest.
+.TP
+.I ~/.config/terminal-router/consent
+Records that this user accepted the security notice.
+.SH SECURITY
+The log captures everything printed in the terminal. Passwords typed at an
+interactive prompt (sudo, SSH password authentication) are
+.B not
+captured, because the tty does not echo them. Secrets that are visible on
+screen
+.B are
+captured: passwords passed as plaintext arguments, tokens in headers, and the
+output of
+.B cat
+on a .env file or a private key. Use
+.B logpause
+before such work.
+.PP
+The directory is mode 0700, log files 0600, and a nightly cron job at 03:00
+deletes logs older than 30 days.
+.SH CAVEATS
+Removing the package does not undo the per\-user setup, because dpkg cannot
+safely edit every user's home directory. Run
+.B terminal\-router remove
+before removing the package.
+.PP
+After upgrading, re-run install to update marked blocks with backups.
+Existing tmux servers retain loaded hooks; reload ~/.tmux.conf and use
+pause/resume in existing panes to replace old pipes.
+.PP
+Never run
+.B terminal\-router
+with sudo: as root it would configure
+.I /root
+instead of your account, and it refuses to do so.
+.SH SEE ALSO
+.BR tmux (1),
+.BR crontab (5)
+.PP
+/usr/share/doc/terminal-router/README
+.SH AUTHOR
+Franco Conidi aka edmond <fconidi@gmail.com>

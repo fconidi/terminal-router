@@ -19,7 +19,12 @@ OUTPUT_DEB="${WORKDIR}/${PKG_NAME}_${PKG_VERSION}_${ARCH}.deb"
 echo "==> $PKG_NAME $PKG_VERSION ($ARCH)"
 echo "==> Target: $OUTPUT_DEB"
 
+# Keep compressed documentation derived from reviewable source files.
+gzip -n -9 -c "$WORKDIR/docs/terminal-router.1" > "$BUILD/usr/share/man/man1/terminal-router.1.gz"
+gzip -n -9 -c "$WORKDIR/docs/changelog" > "$BUILD/usr/share/doc/terminal-router/changelog.gz"
+
 # Perms
+chmod 644 "$BUILD/usr/share/terminal-router/common.sh"
 chmod 755 "$BUILD/usr/share/terminal-router/install.sh"
 chmod 755 "$BUILD/usr/bin/terminal-router"
 chmod 644 "$BUILD/usr/share/applications/terminal-router.desktop"
