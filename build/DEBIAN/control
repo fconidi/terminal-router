@@ -1,9 +1,9 @@
 Package: terminal-router
-Version: 1.0.7
+Version: 1.1.0
 Section: net
 Priority: optional
 Architecture: all
-Depends: bash, tmux
+Depends: bash, tmux (>= 3.0)
 Recommends: cron
 Suggests: terminator
 Maintainer: Franco Conidi aka edmond <fconidi@gmail.com>
@@ -27,6 +27,8 @@ Description: Terminal Router - tmux session recorder for AI-assisted router work
   - Each pane (session, window, split) is logged to its own timestamped file
   - Stable ~/.claude-logs/latest symlink always points at the newest pane
   - logpause / logresume kill-switch for sensitive work
+  - pause / resume commands also available in one-shot launch sessions
+  - doctor checks setup, permissions and live tmux panes without changing them
   - Strict permissions: directory 0700, log files 0600
   - Automatic rotation: logs older than 30 days deleted nightly at 03:00
   - Clean removal: terminal-router remove undoes every change, with backups
@@ -35,4 +37,4 @@ Description: Terminal Router - tmux session recorder for AI-assisted router work
  install time: the user must explicitly opt in from the menu entry or with
  "terminal-router install", after acknowledging that the log captures whatever
  is printed on screen.
-Installed-Size: 140
+Installed-Size: 148

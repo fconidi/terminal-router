@@ -19,15 +19,12 @@
 set -euo pipefail
 
 MODE="${1:-full}"
+case "$MODE" in full|logdir-only) ;; *) echo "ERROR: unknown mode: $MODE" >&2; exit 1 ;; esac
 
 # Marker strings are intentionally kept as "claude-terminal-log" (the name of
 # the standalone script this package supersedes) so that machines set up with
 # the pre-packaging installer are recognised, updated and removed correctly.
-MARK_BEGIN="# >>> claude-terminal-log >>>"
-MARK_END="# <<< claude-terminal-log <<<"
-LOGDIR="$HOME/.claude-logs"
-RCFILE="$HOME/.bashrc"
-[ "$(basename "${SHELL:-}")" = "zsh" ] && RCFILE="$HOME/.zshrc"
+source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
 echo "== terminal-router: install =="
 
@@ -50,6 +47,12 @@ fi
 # definitions, so detect it and stop. Not relevant in logdir-only mode, which
 # never touches either file.
 if [ "$MODE" = "full" ]; then
+    for f in "$RCFILE" "$HOME/.tmux.conf"; do
+        if ! valid_block "$f"; then
+            echo "ERROR: unbalanced or duplicate markers in $f; no files changed." >&2
+            exit 1
+        fi
+    done
     legacy_unmarked() {
         local f="$1"
         [ -f "$f" ] || return 1
@@ -85,49 +88,52 @@ cat > "$LOGDIR/pipe-logger.sh" <<'EOF'
 # Auto-invoked by a tmux hook (~/.tmux.conf). Logs one pane to its own file and
 # keeps ~/.claude-logs/latest pointing at the most recently created pane, so
 # Claude Code always has a stable path to tail.
+set -euo pipefail
 umask 077
 LOGDIR="$HOME/.claude-logs"
 TS=$(date +%Y%m%d-%H%M%S)
-FILE="$LOGDIR/tmux-$1-$2-$3-$TS.log"
-ln -sf "$FILE" "$LOGDIR/latest"
+# Session names are data, never paths; mktemp also separates rapid resumes.
+LABEL="${1:-session}-${2:-0}-${3:-0}"
+LABEL="${LABEL//[^a-zA-Z0-9_-]/_}"
+FILE=$(mktemp "$LOGDIR/tmux-${LABEL:0:100}-$TS-XXXXXX.log")
+LINK="$FILE.latest"
+trap 'rm -f -- "$LINK"' EXIT
+ln -s "$FILE" "$LINK"
+mv -Tf "$LINK" "$LOGDIR/latest"
 cat >> "$FILE"
 EOF
 chmod 700 "$LOGDIR/pipe-logger.sh"
 echo "OK    $LOGDIR/pipe-logger.sh (dir 700, new files 600 via umask)"
 
 # --- rotation: daily cron, delete logs older than 30 days ---
-CRON_LINE="find $LOGDIR -maxdepth 1 -name 'tmux-*.log' -mtime +30 -delete"
 if ! command -v crontab > /dev/null 2>&1; then
     echo "WARN  crontab not found — log rotation not configured."
     echo "      Install cron (sudo apt install cron) and re-run, or prune manually."
-elif crontab -l 2>/dev/null | grep -qF "$LOGDIR"; then
-    echo "SKIP  crontab (rotation already present)"
 else
-    # 'crontab -l || true': it exits 1 when the user has no crontab at all,
-    # which under set -e + pipefail would abort the whole installer.
-    { crontab -l 2>/dev/null || true; echo "0 3 * * * $CRON_LINE"; } | crontab -
-    echo "OK    crontab: daily 03:00, logs older than 30 days deleted"
+    cron_list=$(crontab -l 2>/dev/null || true)
+    if printf '%s\n' "$cron_list" | grep -Fx "$ROTATION" >/dev/null; then
+        echo "SKIP  crontab (rotation already present)"
+    else
+        { if [ -n "$cron_list" ]; then printf '%s\n' "$cron_list" | without_rotation; fi
+          printf '%s\n' "$ROTATION"; } | crontab -
+        echo "OK    crontab: daily 03:00, logs older than 30 days deleted"
+    fi
 fi
 
 if [ "$MODE" = "full" ]; then
 
 # --- ~/.tmux.conf ---
-TMUX_BLOCK="$MARK_BEGIN
-# Auto-log every pane (session/window/split) for real-time monitoring by
-# Claude Code. Files: ~/.claude-logs/tmux-<sess>-<win>-<pane>-<timestamp>.log
-# Always-current symlink: ~/.claude-logs/latest
-set-hook -g after-new-session 'pipe-pane -o \"~/.claude-logs/pipe-logger.sh #S #I #P\"'
-set-hook -g after-new-window 'pipe-pane -o \"~/.claude-logs/pipe-logger.sh #S #I #P\"'
-set-hook -g after-split-window 'pipe-pane -o \"~/.claude-logs/pipe-logger.sh #S #I #P\"'
-$MARK_END"
+TMUX_BLOCK=$(cat <<'TMUXEOF'
+# >>> claude-terminal-log >>>
+# Log each pane. Quote both the logger path and the session name for the shell.
+set-hook -g after-new-session { pipe-pane -o 'exec "$HOME/.claude-logs/pipe-logger.sh" #{q:session_name} #I #P' }
+set-hook -g after-new-window { pipe-pane -o 'exec "$HOME/.claude-logs/pipe-logger.sh" #{q:session_name} #I #P' }
+set-hook -g after-split-window { pipe-pane -o 'exec "$HOME/.claude-logs/pipe-logger.sh" #{q:session_name} #I #P' }
+# <<< claude-terminal-log <<<
+TMUXEOF
+)
 
-touch "$HOME/.tmux.conf"
-if grep -qF "$MARK_BEGIN" "$HOME/.tmux.conf"; then
-    echo "SKIP  ~/.tmux.conf (block already present)"
-else
-    printf '\n%s\n' "$TMUX_BLOCK" >> "$HOME/.tmux.conf"
-    echo "OK    ~/.tmux.conf updated"
-fi
+update_block "$HOME/.tmux.conf" "$TMUX_BLOCK"
 
 # --- rc file (bashrc/zshrc) ---
 RC_BLOCK="$MARK_BEGIN
@@ -142,31 +148,11 @@ fi
 
 # Logging kill-switch: suspend before sensitive work (production SSH, secrets,
 # credentials), resume afterwards. Only meaningful inside a tmux session.
-logpause() {
-    if [ -n \"\${TMUX:-}\" ]; then
-        tmux pipe-pane
-        echo \"[logging suspended for this pane]\"
-    else
-        echo \"[not inside tmux, nothing to suspend]\"
-    fi
-}
-logresume() {
-    if [ -n \"\${TMUX:-}\" ]; then
-        tmux pipe-pane -o \"~/.claude-logs/pipe-logger.sh #S #I #P\"
-        echo \"[logging resumed, new file]\"
-    else
-        echo \"[not inside tmux, nothing to resume]\"
-    fi
-}
+logpause() { terminal-router pause; }
+logresume() { terminal-router resume; }
 $MARK_END"
 
-touch "$RCFILE"
-if grep -qF "$MARK_BEGIN" "$RCFILE"; then
-    echo "SKIP  $RCFILE (block already present)"
-else
-    printf '\n%s\n' "$RC_BLOCK" >> "$RCFILE"
-    echo "OK    $RCFILE updated"
-fi
+update_block "$RCFILE" "$RC_BLOCK"
 
 echo
 echo "Done. Open a new terminal (or: source $RCFILE) to activate."

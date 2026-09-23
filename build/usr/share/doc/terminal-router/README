@@ -37,7 +37,7 @@ Files
   ~/.tmux.conf (marked block)   hooks that start logging on each new pane
   ~/.claude-logs/               log directory, mode 0700
   ~/.claude-logs/pipe-logger.sh the logger itself
-  ~/.claude-logs/tmux-<session>-<window>-<pane>-<timestamp>.log
+  ~/.claude-logs/tmux-<safe-label>-<timestamp>-<unique-suffix>.log
                                 one file per pane, mode 0600
   ~/.claude-logs/latest         symlink to the newest pane log
   ~/.config/terminal-router/consent
@@ -62,8 +62,15 @@ Commands
   terminal-router launch     log a single session only, no dotfile edits
   terminal-router remove     undo them (files backed up as *.terminal-router.bak)
   terminal-router status     what is active, how much has been logged
-  terminal-router tail       follow the newest pane log
+  terminal-router tail       follow the newest pane log, including latest changes
+  terminal-router doctor     read-only setup, permission and live-pane checks
+  terminal-router pause      suspend capture in the calling tmux pane
+  terminal-router resume     resume capture in that pane, including launch mode
   terminal-router menu       interactive menu, used by the desktop entry
+
+Detaching with Ctrl+b d does not stop recording. Use terminal-router pause
+before sensitive work, and resume afterwards. An already active pipe is left
+unchanged. After install, shell shortcuts are also available:
 
 Inside a logged pane:
 
@@ -138,9 +145,14 @@ Several tabs show the same content
   happen; check that the block in ~/.bashrc has not been edited by hand.
 
 The log is empty, or latest does not exist
+  Start with terminal-router doctor. It reports setup/permission errors with
+  exit status 1; missing rotation or idle sessions are advisory warnings.
+  An open pipe alone does not prove that data reaches disk.
   Check the hooks are loaded: tmux show-hooks -g | grep pipe-pane
-  If missing, ~/.tmux.conf was not read. Restart the tmux server with
-  tmux kill-server, then open a new terminal. That closes all tmux sessions.
+  If missing, reload with tmux source-file ~/.tmux.conf and start a new pane.
+  After an upgrade, re-run terminal-router install to update marked blocks
+  with backups. Existing panes need terminal-router pause / resume to replace
+  old pipes. One-shot users can start a fresh terminal-router launch session.
 
 Removing the package does not undo the per-user setup
   Correct: dpkg cannot safely edit every user's HOME. Run

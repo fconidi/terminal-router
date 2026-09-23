@@ -3,6 +3,35 @@
 All notable changes to this project are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.1.0] - 2026-09-23
+
+### Added
+- `pause` and `resume` commands target the calling pane, including one-shot
+  `launch` sessions. Existing `logpause` / `logresume` become shortcuts.
+- Read-only `doctor` command checks setup, permissions, the `latest` link and
+  live tmux panes. Errors return exit status 1; advisory warnings do not.
+- Integration tests using temporary homes, a fake crontab and private tmux
+  sockets; no router, credentials or real user configuration are required.
+
+### Fixed
+- Quote session names and logger paths before passing them to the shell;
+  sanitize file labels, create unique private logs for rapid resumes and
+  replace `latest` atomically after creating the log.
+- `launch` handles nonzero window indices and renumbering, checks setup
+  failures and cleans up its new session if configuring hooks fails.
+- `install` and `launch` propagate installer errors instead of reporting success.
+- `tail` follows changes to `latest` instead of staying on the previous log.
+- Reinstall updates existing marked blocks with backups; incomplete or duplicate
+  markers are rejected before editing. Removal checks both Bash and Zsh files.
+- Rotation quotes HOME and matches only the exact managed cron entry, preserving
+  unrelated jobs mentioning the log directory and migrating the old entry.
+- Clarify that detaching tmux leaves capture running.
+
+### Changed
+- Require tmux 3.0 or newer for the hook command syntax.
+- Keep editable man-page and Debian changelog sources under `docs/`; rebuild
+  their compressed copies when packaging.
+
 ## [1.0.7] - 2026-09-15
 
 ### Fixed

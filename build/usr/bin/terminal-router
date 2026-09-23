@@ -5,20 +5,14 @@
 # follow a live router CLI session in real time without any access to the
 # device itself.
 #
-# Usage: terminal-router [install|remove|status|tail|menu|help]
+# Usage: terminal-router <command> (see help)
 
 set -uo pipefail
 
-VERSION="1.0.7"
-MARK_BEGIN="# >>> claude-terminal-log >>>"
-MARK_END="# <<< claude-terminal-log <<<"
-SED_RANGE='/^# >>> claude-terminal-log >>>$/,/^# <<< claude-terminal-log <<<$/d'
-LOGDIR="$HOME/.claude-logs"
+VERSION="1.1.0"
 INSTALLER="/usr/share/terminal-router/install.sh"
 CONSENT="$HOME/.config/terminal-router/consent"
-
-RCFILE="$HOME/.bashrc"
-[ "$(basename "${SHELL:-}")" = "zsh" ] && RCFILE="$HOME/.zshrc"
+source /usr/share/terminal-router/common.sh || exit 1
 
 die() { echo "terminal-router: $*" >&2; exit 1; }
 
@@ -85,7 +79,8 @@ show_warning() {
     - the output of `cat` on a .env file or a private key
     - anything you export or paste in plain sight
 
-  Use `logpause` before such work and `logresume` afterwards.
+  Use `terminal-router pause` before such work and `terminal-router resume`
+  afterwards, inside the pane being recorded.
 
 WARN
 }
@@ -96,9 +91,9 @@ ensure_consent() {
     read -rp "  Enable terminal session logging? [y/N] " ans
     case "$ans" in
         y|Y|yes|YES)
-            mkdir -p "$(dirname "$CONSENT")"
-            printf 'accepted %s by %s\n' "$(date -Is)" "$(id -un)" > "$CONSENT"
-            chmod 600 "$CONSENT"
+            mkdir -p "$(dirname "$CONSENT")" || return 1
+            (umask 077; printf 'accepted %s by %s\n' "$(date -Is)" "$(id -un)" > "$CONSENT") || return 1
+            chmod 600 "$CONSENT" || return 1
             return 0
             ;;
         *)
@@ -113,7 +108,7 @@ cmd_install() {
     require_user
     [ -x "$INSTALLER" ] || die "installer missing: $INSTALLER"
     ensure_consent || return 1
-    bash "$INSTALLER"
+    bash "$INSTALLER" || return $?
     warn_no_assistant
 }
 
@@ -122,7 +117,7 @@ cmd_launch() {
     [ -n "${TMUX:-}" ] && die "already inside a tmux session — detach first (Ctrl+b d), then run 'terminal-router launch' from a plain shell."
     [ -x "$INSTALLER" ] || die "installer missing: $INSTALLER"
     ensure_consent || return 1
-    bash "$INSTALLER" logdir-only
+    bash "$INSTALLER" logdir-only || return $?
     warn_no_assistant
 
     # Session-scoped hooks (no -g) log only this session's windows/splits and
@@ -131,19 +126,24 @@ cmd_launch() {
     # chained onto, or run against, that first pane silently no-ops), so the
     # hooks are set first and then a throwaway window 0 is swapped for a
     # window created after them, which the after-new-window hook does pipe.
-    local hook='~/.claude-logs/pipe-logger.sh #S #I #P'
+    local hook='exec "$HOME/.claude-logs/pipe-logger.sh" #{q:session_name} #I #P'
     local session="router-$$"
+    local first_window
 
-    tmux new-session -d -s "$session" || die "could not create tmux session"
-    tmux set-hook -t "$session" after-new-window "pipe-pane -o '$hook'"
-    tmux set-hook -t "$session" after-split-window "pipe-pane -o '$hook'"
-    tmux new-window -t "$session"
-    tmux kill-window -t "$session:0"
+    first_window=$(tmux new-session -d -P -F '#{window_id}' -s "$session") || die "could not create tmux session"
+    if ! tmux set-hook -t "$session" after-new-window "pipe-pane -o '$hook'" ||
+       ! tmux set-hook -t "$session" after-split-window "pipe-pane -o '$hook'" ||
+       ! tmux new-window -t "$session" ||
+       ! tmux kill-window -t "$first_window"; then
+        tmux kill-session -t "$session" 2>/dev/null || true
+        die "could not configure logging; the new session was closed."
+    fi
 
     echo
     echo "Logging only this terminal. ~/.bashrc, ~/.zshrc and ~/.tmux.conf are"
     echo "untouched, so every other terminal (Terminator included) is unaffected."
-    echo "Detach with Ctrl+b d to stop and fall back to a plain shell; exit ends it."
+    echo "Detach with Ctrl+b d to return to a plain shell; logging continues."
+    echo "Use terminal-router pause/resume inside the pane; exit ends the session."
     echo
     exec tmux attach -t "$session"
 }
@@ -152,7 +152,11 @@ cmd_remove() {
     require_user
     echo "== terminal-router: remove =="
 
-    for f in "$RCFILE" "$HOME/.tmux.conf"; do
+    for f in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.tmux.conf"; do
+        valid_block "$f" || die "unbalanced or duplicate markers in $f; no files changed."
+    done
+
+    for f in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.tmux.conf"; do
         if [ -f "$f" ] && ! grep -qF "$MARK_BEGIN" "$f" 2>/dev/null &&
            grep -qE 'logpause\(\)|claude-logs/pipe-logger\.sh' "$f" 2>/dev/null; then
             echo "WARN  $f holds an older, unmarked setup." >&2
@@ -165,10 +169,10 @@ cmd_remove() {
     done
 
     local removed=0
-    for f in "$RCFILE" "$HOME/.tmux.conf"; do
+    for f in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.tmux.conf"; do
         if [ -f "$f" ] && grep -qF "$MARK_BEGIN" "$f"; then
-            cp -a "$f" "$f.terminal-router.bak"
-            sed -i "$SED_RANGE" "$f"
+            cp -a "$f" "$f.terminal-router.bak" || die "could not back up $f"
+            sed -i "$SED_RANGE" "$f" || die "could not update $f"
             echo "OK    block removed from $f (backup: $f.terminal-router.bak)"
             removed=1
         else
@@ -179,8 +183,8 @@ cmd_remove() {
     if command -v crontab > /dev/null 2>&1; then
         local cron_list
         cron_list=$(crontab -l 2>/dev/null || true)
-        if printf '%s\n' "$cron_list" | grep -qF "$LOGDIR"; then
-            printf '%s\n' "$cron_list" | grep -vF "$LOGDIR" | crontab -
+        if printf '%s\n' "$cron_list" | has_rotation; then
+            printf '%s\n' "$cron_list" | without_rotation | crontab - || die "could not update crontab"
             echo "OK    crontab rotation entry removed"
         else
             echo "SKIP  crontab (no rotation entry)"
@@ -243,7 +247,7 @@ cmd_status() {
         echo "                  (an older hand-edited setup without markers)"
     fi
 
-    if command -v crontab > /dev/null 2>&1 && crontab -l 2>/dev/null | grep -qF "$LOGDIR"; then
+    if command -v crontab > /dev/null 2>&1 && crontab -l 2>/dev/null | has_rotation; then
         echo "  log rotation    ACTIVE     (daily 03:00, keeps 30 days)"
     else
         echo "  log rotation    not set"
@@ -286,10 +290,92 @@ cmd_status() {
 }
 
 cmd_tail() {
-    [ -e "$LOGDIR/latest" ] || die "no log yet — run 'terminal-router install', then open a new terminal."
+    [ -e "$LOGDIR/latest" ] || die "no log yet — run 'terminal-router launch', or install and open a new terminal."
     echo "Following $(readlink -f "$LOGDIR/latest")  (Ctrl+C to stop)"
     echo
-    tail -f "$LOGDIR/latest"
+    tail -F --max-unchanged-stats=1 "$LOGDIR/latest"
+}
+
+require_pane() {
+    require_user
+    [ -n "${TMUX:-}" ] && [[ "${TMUX_PANE:-}" =~ ^%[0-9]+$ ]] ||
+        die "run this command inside a tmux pane."
+}
+
+cmd_pause() {
+    require_pane
+    tmux pipe-pane -t "$TMUX_PANE" || die "could not pause this pane."
+    echo "[logging suspended for pane $TMUX_PANE]"
+}
+
+cmd_resume() {
+    require_pane
+    [ -f "$CONSENT" ] || die "logging not enabled; run 'terminal-router launch' or 'terminal-router install' first."
+    [ -x "$LOGDIR/pipe-logger.sh" ] || die "logger missing; re-run 'terminal-router install' or 'terminal-router launch'."
+    local active
+    active=$(tmux display-message -p -t "$TMUX_PANE" '#{pane_pipe}') || die "could not inspect this pane."
+    if [ "$active" = 1 ]; then
+        echo "[pane $TMUX_PANE already has an active pipe; unchanged]"
+        return 0
+    fi
+    tmux pipe-pane -o -t "$TMUX_PANE" 'exec "$HOME/.claude-logs/pipe-logger.sh" #{q:session_name} #I #P' ||
+        die "could not resume this pane."
+    echo "[logging resumed for pane $TMUX_PANE, new file]"
+}
+
+cmd_doctor() {
+    local failed=0 f target panes
+    echo "terminal-router $VERSION — diagnostics (read-only)"
+    if command -v tmux >/dev/null 2>&1; then
+        echo "OK    $(tmux -V)"
+    else
+        echo "FAIL  tmux missing; install the tmux package."
+        failed=1
+    fi
+    if [ -f "$CONSENT" ] && [ -x "$LOGDIR/pipe-logger.sh" ]; then
+        echo "OK    consent and logger present"
+    else
+        echo "FAIL  setup incomplete; run terminal-router install or launch."
+        failed=1
+    fi
+    if [ -d "$LOGDIR" ] && [ -O "$LOGDIR" ] && [ "$(stat -c %a "$LOGDIR")" = 700 ]; then
+        echo "OK    log directory owned by current user, mode 0700"
+        if [ -n "$(find "$LOGDIR" -maxdepth 1 -type f -name 'tmux-*.log' -perm /077 -print -quit)" ]; then
+            echo "FAIL  log files readable by other users; set log permissions to 0600."
+            failed=1
+        fi
+    else
+        echo "FAIL  log directory missing, wrong owner or mode; expected 0700 at $LOGDIR"
+        failed=1
+    fi
+    for f in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.tmux.conf"; do
+        if ! valid_block "$f"; then
+            echo "FAIL  unbalanced or duplicate markers: $f"
+            failed=1
+        fi
+    done
+    if [ -L "$LOGDIR/latest" ]; then
+        target=$(readlink -f "$LOGDIR/latest")
+        if [[ "$target" == "$(readlink -f "$LOGDIR")"/tmux-*.log ]] && [ -f "$target" ]; then
+            echo "OK    latest points to an existing log"
+        else
+            echo "FAIL  latest is broken or outside the log directory; start/resume a logged pane."
+            failed=1
+        fi
+    else
+        echo "WARN  no latest log yet; start a logged session."
+    fi
+    if ! command -v crontab >/dev/null 2>&1 || ! crontab -l 2>/dev/null | has_rotation; then
+        echo "WARN  rotation not configured; install cron and re-run setup."
+    fi
+    panes=$(tmux list-panes -a -F '  #{session_name}:#{window_index}.#{pane_index} (#{pane_id}) pipe=#{pane_pipe}' 2>/dev/null) || panes=""
+    if [ -n "$panes" ]; then
+        echo "Live panes (pipe=1 means a pipe is open, not proof of disk writes):"
+        printf '%s\n' "$panes"
+    else
+        echo "WARN  no running tmux panes."
+    fi
+    return "$failed"
 }
 
 cmd_menu() {
@@ -308,6 +394,7 @@ cmd_menu() {
         echo "  3) Follow the live log"
         echo "  4) Show the security notice"
         echo "  5) Launch a single logged session (this terminal only)"
+        echo "  6) Diagnose logging and permissions"
         echo "  q) Quit"
         echo
         read -rp "  Choice: " choice
@@ -318,6 +405,7 @@ cmd_menu() {
             3) cmd_tail ;;
             4) show_warning ;;
             5) cmd_launch ;;
+            6) cmd_doctor ;;
             q|Q|"") exit 0 ;;
             *) echo "  Unknown choice." ;;
         esac
@@ -341,11 +429,15 @@ Usage: terminal-router <command>
   launch    Log only this terminal, one-shot — no ~/.bashrc/~/.zshrc/~/.tmux.conf edits
   remove    Remove them again (with backups) and optionally delete the logs
   status    Show what is active and how much has been logged
+  doctor    Check setup, permissions and live panes (read-only; exit 1 on errors)
   tail      Follow the most recent pane log
+  pause     Suspend capture in the calling tmux pane
+  resume    Resume capture in the calling pane (also works with launch)
   menu      Interactive menu (used by the desktop entry)
   help      This text
 
-Inside a logged pane: logpause / logresume suspend and resume capture.
+Inside a logged pane: terminal-router pause / resume suspend and resume capture.
+After install, logpause / logresume are shortcuts. Detaching does not stop logging.
 
 Everything is per-user and lives in \$HOME. Never run this with sudo.
 See /usr/share/doc/terminal-router/README for details.
@@ -357,6 +449,9 @@ case "${1:-menu}" in
     launch|single)  cmd_launch ;;
     remove|uninstall) cmd_remove ;;
     status)         cmd_status ;;
+    doctor)         cmd_doctor ;;
+    pause)          cmd_pause ;;
+    resume)         cmd_resume ;;
     tail|log|follow) cmd_tail ;;
     menu)           cmd_menu ;;
     help|-h|--help) cmd_help ;;

@@ -1,11 +1,12 @@
 a00740e88f4bc6cee7732805b38ba22a  etc/xdg/menus/applications-merged/terminal-router.menu
-7552a62be295c47b7c8ce3175b9f0f56  usr/bin/terminal-router
+660c127a74b413794c81fba6c0b289ac  usr/bin/terminal-router
 76070f6b674ed9187978f99dfca7f7f1  usr/share/applications/terminal-router.desktop
-7d909993d0c9b1949a352ccf32b1de2a  usr/share/doc/terminal-router/changelog.gz
+c8f67208c373d122b9e6b40752f06b2b  usr/share/doc/terminal-router/README
+711964f270f069f4de76bc1e50db18b1  usr/share/doc/terminal-router/changelog.gz
 fbd18c45ef4f5f36d3af152112860669  usr/share/doc/terminal-router/copyright
-8039e8e805878f7b80ebaed0deae3740  usr/share/doc/terminal-router/README
 0b7b731d01da3270f07a22f5ca9010dd  usr/share/icons/hicolor/128x128/apps/terminal-router.png
 a6c2c4db86448df00d47a544b76860e2  usr/share/icons/hicolor/256x256/apps/terminal-router.png
 5efd3efa712a3ee11effca4ae1f1faec  usr/share/icons/hicolor/48x48/apps/terminal-router.png
-37735c20a4e240b59a5a3d2a5180d16d  usr/share/man/man1/terminal-router.1.gz
-80f41174866d0dcf2cce12a57d24d6b7  usr/share/terminal-router/install.sh
+c37d97305828dbc2dd8e730b447c1382  usr/share/man/man1/terminal-router.1.gz
+1ee79ba989d5f0d38074dc1a7f8f726c  usr/share/terminal-router/common.sh
+77ca07ab596f126dec1f6009be84029e  usr/share/terminal-router/install.sh
