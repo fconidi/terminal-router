@@ -1,9 +1,10 @@
 # terminal-router
 
-Records every interactive terminal session into a per-pane log file under
-`~/.claude-logs`, so an AI assistant such as Claude Code or Codex can follow
-a live CLI session in real time by reading a single file — without ever
-having access to the device or shell itself.
+Opens an integrated two-pane terminal: **router/switch shell on the left,
+Claude Code or Codex observer on the right**. Connect to the device from the
+left pane; the right pane automatically reads its recorded output and explains
+what changes. Ask questions there without opening another terminal or telling
+the assistant which tmux log to read.
 
 The typical use case is an interactive SSH session on a Cisco or Huawei
 router: the assistant has no access to the device and never needs any. The
@@ -11,6 +12,37 @@ operator types, the assistant reads the log and suggests, the operator
 decides what to run.
 
 ## How it works
+
+```bash
+terminal-router          # Claude if available, otherwise Codex
+terminal-router claude   # explicitly choose Claude Code
+terminal-router codex    # explicitly choose Codex
+```
+
+The desktop entry opens this workspace directly. Each workspace has its own
+tmux server: only the left pane is recorded, and the observer follows a stable
+link specific to that workspace. Other workspaces and resumed capture do not
+redirect the assistant to a different device or to its own output.
+Click a pane to switch, or use Ctrl+b followed by an arrow key.
+
+- **F9 / F10:** pause/resume router recording, including while connected over SSH.
+- In the AI pane, type a question or press Enter to analyse the current output.
+- `:auto off` / `:auto on`: disable/enable automatic analysis. Questions still work.
+- `:quit`: close the observer; the router pane remains available.
+
+Automatic analysis groups updates after two quiet seconds (at most five seconds
+of continuous output), with at least ten seconds between automatic requests.
+AI response time is additional. Unchanged output makes no new request. Each
+request contains up to 80 recent lines / 16 KiB and the previous exchange, not
+the entire session history. AI errors stop automatic requests; fix CLI login
+or configuration and use `:auto on` to retry.
+
+Captured output is sent to the chosen AI provider through your authenticated
+CLI, with normal account usage. Replies are advice: the observer never types
+or executes commands in the router pane. Pausing capture prevents new automatic
+requests; a request already sent can still finish.
+
+The existing global recording mode remains available with `terminal-router install`:
 
 - Every interactive terminal you open enters its own tmux session, via a
   marked block added to `~/.bashrc` (or `~/.zshrc`).
@@ -27,8 +59,8 @@ Nothing is written to `~/.bashrc`, `~/.zshrc` or `~/.tmux.conf` — every
 other terminal, Terminator tabs included, stays unaffected.
 
 Everything is per-user and confined to `$HOME`. Nothing is enabled at
-install time — you opt in explicitly with `terminal-router install` (or
-`launch`), after acknowledging that the log captures whatever is printed
+install time — you opt in by opening a workspace, or using `install` or
+`launch`, after acknowledging that the log captures whatever is printed
 on screen. Never run these as root: they configure the calling user's
 `$HOME`, and `sudo` would target `/root` instead.
 
@@ -36,6 +68,8 @@ on screen. Never run these as root: they configure the calling user's
 
 | Command | Effect |
 |---|---|
+| `terminal-router [claude\|codex]` | integrated router + AI workspace (also the default with no arguments) |
+| `terminal-router workspace [claude\|codex]` | explicit workspace command |
 | `terminal-router install` | set up the hooks for the current user (every terminal) |
 | `terminal-router launch` | log a single session only, no dotfile edits |
 | `terminal-router remove` | undo them (files backed up as `*.terminal-router.bak`) |
@@ -44,13 +78,14 @@ on screen. Never run these as root: they configure the calling user's
 | `terminal-router tail` | follow the newest pane log, switching when `latest` changes |
 | `terminal-router pause` | suspend capture in the calling tmux pane |
 | `terminal-router resume` | resume that pane into a new log |
-| `terminal-router menu` | interactive menu (used by the desktop entry) |
+| `terminal-router menu` | configuration menu and alternate launch options |
 
 Inside a logged pane, use `terminal-router pause` before sensitive work and
 `terminal-router resume` afterwards. These commands also work with `launch`.
 After `install`, `logpause` and `logresume` are shell shortcuts.
 Repeating `resume` while a pipe is active leaves it unchanged.
-Detaching with **Ctrl+b d does not stop logging**; pause first if needed.
+Detaching with **Ctrl+b d does not stop logging or the observer**; pause first
+if needed. Workspace F9/F10 always target the original router pane.
 
 `doctor` returns 1 when it finds a setup or permission error, and 0 otherwise.
 Missing rotation or an idle tmux server are advisory warnings. A live pipe
@@ -83,9 +118,16 @@ manually clean up with `rm ~/.claude-logs/tmux-*.log` when needed.
 
 ## Requirements
 
-`bash`, `tmux >= 3.0`. `cron` recommended (log rotation); `claude` and/or `codex`
-on `PATH` so something actually reads the log — `install`/`launch`/`status`
-warn (without blocking) if neither is found.
+`bash`, `tmux >= 3.0`, `python3` (standard library only). `cron` is recommended
+for log rotation. Workspaces require a current, authenticated Claude Code or
+Codex CLI, found on PATH, in `~/.local/bin`, or under nvm. Recording-only commands
+still work without AI.
+
+The observer disables shell tools and configured integrations and ignores project
+configuration. Codex also runs read-only. Authentication is retained; optional
+`TR_CLAUDE_MODEL` / `TR_CODEX_MODEL` select a model, otherwise the CLI default
+is used. Older CLIs lacking these flags report an error rather than falling
+back to more permissive execution.
 
 ## Install
 
@@ -95,8 +137,8 @@ warn (without blocking) if neither is found.
 git clone https://github.com/fconidi/terminal-router.git
 cd terminal-router
 bash build-deb.sh
-sudo apt install ./terminal-router_*_all.deb
-terminal-router install   # as your normal user, not root
+sudo apt install ./terminal-router_1.2.0_all.deb
+terminal-router           # as your normal user, not root
 ```
 
 After upgrading from 1.0.x, re-run `terminal-router install` if you use the
@@ -126,7 +168,7 @@ this repo with full commit history via `git subtree`:
 scripts/sync-from-monorepo.sh [path-to-syslinuxos-packages]
 ```
 
-The 1.1.0 changes were developed in this standalone repository; reconcile them
+The 1.1.x and 1.2.0 changes were developed in this standalone repository; reconcile them
 with the monorepo before the next sync to avoid restoring older code.
 
 ## Development checks
@@ -138,9 +180,10 @@ python3 -m unittest discover -s tests -v
 bash build-deb.sh
 ```
 
-Tests isolate HOME and tmux sockets under `/tmp` and replace `crontab` with a
-temporary file. They exercise real tmux hooks and log output; attachment alone
-is stubbed so the suite can run without an interactive terminal.
+Tests isolate HOME and tmux sockets under `/tmp`, use a fake crontab, and
+simulate both AI CLIs. They exercise actual tmux capture, automatic analysis,
+operator questions and F9/F10 through a pseudoterminal. No router or AI account
+is contacted; live authentication/model quality still needs an operator test.
 
 Hook arguments use tmux's shell-quoting modifier, as documented in the
 [tmux formats reference](https://github.com/tmux/tmux/wiki/Formats).

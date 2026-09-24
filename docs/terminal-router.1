@@ -1,15 +1,26 @@
-.TH TERMINAL-ROUTER 1 "September 2026" "terminal-router 1.1.1" "SysLinuxOS Manual"
+.TH TERMINAL-ROUTER 1 "September 2026" "terminal-router 1.2.0" "SysLinuxOS Manual"
 .SH NAME
 terminal\-router \- record tmux terminal sessions for AI\-assisted router work
 .SH SYNOPSIS
 .B terminal\-router
-.RI [ command ]
+.RI [ claude | codex | command ]
+.br
+.B terminal\-router workspace
+.RI [ claude | codex ]
 .SH DESCRIPTION
 .B terminal\-router
-logs every interactive terminal session to a per\-pane file under
-.IR ~/.claude\-logs ,
-so an AI assistant such as Claude Code can follow live work on a network device
-CLI in real time by reading a single file.
+opens a two\-pane tmux workspace by default. The left pane is a normal shell
+for connecting to a router or switch. The right pane runs a Claude Code or
+Codex observer that automatically analyses new recorded output and answers
+questions typed by the operator. No separate assistant terminal or manual log
+selection is required.
+.PP
+Each workspace uses a private tmux server and captures only the original left
+pane under
+.IR ~/.claude\-logs .
+The observer follows a workspace\-specific link across pause/resume; opening
+another workspace does not redirect it to another device or to its own output.
+User tmux configuration and global recording hooks are not loaded into this server.
 .PP
 The intended workflow is an interactive SSH session on a Cisco or Huawei
 router. The assistant has no access to the device and never needs any: the
@@ -31,6 +42,16 @@ nor
 is found on PATH, since the log they set up then has no AI assistant to
 read it.
 .SH COMMANDS
+.TP
+.BR workspace " [claude|codex]"
+Open the integrated workspace. With no arguments, terminal\-router does the
+same. Automatic engine selection prefers Claude Code, then Codex. Click a pane
+to switch or use Ctrl\-b followed by an arrow key. Initial focus is on the router.
+.TP
+.BR claude ", " codex
+Open the workspace using exactly the named engine. A missing engine produces
+an error; it is not silently replaced by the other engine. The CLI must already
+be installed and authenticated.
 .TP
 .B install
 Set up the shell and tmux hooks for the calling user. Idempotent. Logs every
@@ -63,7 +84,8 @@ Report which hooks are active, whether rotation is configured, whether
 .B claude
 or
 .B codex
-is on PATH to read the log, how many logs exist and which pane is current.
+is on PATH to read the log, how many logs exist and which panes are current,
+including integrated workspaces on private tmux servers.
 .TP
 .B tail
 Follow the newest pane log, switching when the latest symlink changes.
@@ -80,10 +102,53 @@ Read-only checks for setup, permissions, latest log and live panes. Returns
 1 for detected errors and 0 otherwise; warnings alone do not cause failure.
 .TP
 .B menu
-Interactive menu. This is what the desktop entry runs.
+Configuration menu and alternate launch modes. The desktop entry opens the
+integrated workspace directly; use menu for global setup or removal.
 .TP
 .B help
 Show usage.
+.SH WORKSPACE CONTROLS
+.TP
+.B F9
+Suspend recording of the original router pane. This works from either pane,
+including while the router shell is inside SSH; no command is sent to the device.
+.TP
+.B F10
+Resume recording into a new file, preserving the observer's log link.
+.TP
+.B Ctrl\-b d
+Detach from tmux. Recording and the observer continue while detached.
+The launcher prints a workspace\-specific reattach command; its socket is at
+.IR ~/.claude\-logs/workspace\-ID/tmux.sock .
+.SH OBSERVER COMMANDS
+Type the following in the right pane:
+.TP
+.I question
+Ask about the latest captured router output. Up to five questions can wait
+while an AI request runs. Questions are not sent to the router as commands.
+.TP
+.B Enter
+Request an analysis immediately, including when automatic analysis is off.
+.TP
+.B :auto off
+Stop automatic AI requests; manual questions remain available. An already
+submitted request can still finish. This does not pause disk recording.
+.TP
+.B :auto on
+Enable automatic analysis, or retry after fixing a CLI/authentication error.
+.TP
+.B :quit
+Close the observer. The router pane remains open and keeps its recording state.
+.PP
+Automatic requests group changes after two quiet seconds, or five seconds of
+continuous output, with a minimum ten\-second interval between requests. Model
+response time is additional. Unchanged output makes no new request. Only one
+request runs at a time, with a 120\-second timeout. Errors stop automatic mode.
+.PP
+Context is limited to the last 80 lines and 16 KiB of the router log, plus the
+previous exchange. It is not a complete session history. Pausing capture with
+F9 prevents new automatic analysis; a request already submitted may complete.
+Manual questions during pause use the last captured output.
 .SH SHELL FUNCTIONS
 After install, shell shortcuts delegate to the pause and resume commands.
 Inside a logged pane,
@@ -107,9 +172,31 @@ Log directory, mode 0700. Contains one 0600 file per pane and the symlink
 .I latest
 pointing at the newest.
 .TP
+.I ~/.claude-logs/workspace-ID/current
+Stable link to this workspace's current router log. Workspace directories are
+private (0700). The AI pane is never recorded by the workspace launcher.
+.TP
 .I ~/.config/terminal-router/consent
 Records that this user accepted the security notice.
+.SH ENVIRONMENT
+.TP
+.B TR_CLAUDE_MODEL
+Optional Claude model override for the observer.
+.TP
+.B TR_CODEX_MODEL
+Optional Codex model override for the observer.
+.PP
+Without these variables the chosen CLI uses its default model. The observer
+retains CLI authentication, but disables shell tools and configured integrations
+and ignores project configuration. Codex also uses a read\-only sandbox.
+Current CLI versions supporting these options are required; unsupported options
+are reported as errors instead of enabling more permissive execution.
 .SH SECURITY
+The integrated workspace sends captured output to the selected AI provider
+through the user's authenticated CLI. Normal account usage applies. AI replies
+are displayed as advice and are never executed or typed into the router pane.
+Recording\-only install/launch do not invoke an AI provider.
+.PP
 The log captures everything printed in the terminal. Passwords typed at an
 interactive prompt (sudo, SSH password authentication) are
 .B not
@@ -121,10 +208,24 @@ output of
 .B cat
 on a .env file or a private key. Use
 .B logpause
-before such work.
+before such work in a local shell, or F9 in an integrated workspace, including
+inside SSH. Use F10 to resume.
 .PP
 The directory is mode 0700, log files 0600, and a nightly cron job at 03:00
 deletes logs older than 30 days.
+.SH EXAMPLES
+.nf
+terminal-router
+terminal-router codex
+terminal-router menu
+terminal-router launch
+terminal-router doctor
+.fi
+.PP
+To reattach to a workspace, replace ID with its directory suffix:
+.nf
+tmux -S ~/.claude-logs/workspace-ID/tmux.sock attach
+.fi
 .SH CAVEATS
 Removing the package does not undo the per\-user setup, because dpkg cannot
 safely edit every user's home directory. Run

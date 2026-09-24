@@ -7,11 +7,42 @@ without any access to the device itself.
 
 The intended workflow: you open an SSH session to a Cisco or Huawei router in
 one pane, the assistant reads ~/.claude-logs/latest in another. You type, it
-reads and suggests, you decide what to run. The log never leaves the machine.
+reads and suggests, you decide what to run. Recording-only modes keep the log local; the AI workspace sends snapshots
+to the selected provider using your CLI account.
 
 
-How it works
-------------
+Integrated workspace (default since 1.2.0)
+-----------------------------------------
+
+  terminal-router          router/switch shell left, AI observer right
+  terminal-router claude   explicitly select Claude Code
+  terminal-router codex    explicitly select Codex
+  terminal-router menu     configuration and alternate launch modes
+
+The desktop icon opens the workspace directly. Click either pane to focus it.
+Only the original router pane is recorded; the observer follows its dedicated
+log link across pause/resume, unaffected by other sessions. It never sends
+commands to the router. Use F9/F10 to pause/resume recording even inside SSH.
+
+In the right pane: type a question, Enter to analyse now, :auto off / :auto on
+for automatic analysis, :quit to close only the observer. New output is grouped
+for 2-5 seconds, with at least 10 seconds between automatic requests; model
+response time is additional. Unchanged output makes no request. Context is up
+to 80 lines / 16 KiB plus the previous exchange. Errors stop automatic requests.
+
+Output is sent to your AI provider using your authenticated CLI, with normal
+account usage. An already submitted request can finish after recording pauses.
+Detaching tmux does not stop recording or the observer. Reattach using:
+  tmux -S ~/.claude-logs/workspace-ID/tmux.sock attach
+
+Requires Python 3 (standard library), tmux >= 3.0, and a current authenticated
+Claude Code or Codex CLI. Optional models: TR_CLAUDE_MODEL / TR_CODEX_MODEL.
+The observer disables shell tools and configured integrations and ignores
+project configuration; Codex also uses read-only mode. Authentication is kept.
+See man terminal-router for the full controls, environment and caveats.
+
+Global recording with terminal-router install
+---------------------------------------------
 
 1. Every interactive terminal you open enters its own tmux session, via a
    marked block added to ~/.bashrc (or ~/.zshrc).
@@ -66,7 +97,7 @@ Commands
   terminal-router doctor     read-only setup, permission and live-pane checks
   terminal-router pause      suspend capture in the calling tmux pane
   terminal-router resume     resume capture in that pane, including launch mode
-  terminal-router menu       interactive menu, used by the desktop entry
+  terminal-router menu       configuration menu and alternate launch modes
 
 Detaching with Ctrl+b d does not stop recording. Use terminal-router pause
 before sensitive work, and resume afterwards. An already active pipe is left

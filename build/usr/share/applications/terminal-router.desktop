@@ -1,10 +1,10 @@
 [Desktop Entry]
 Type=Application
 Name=Terminal Router
-GenericName=Terminal Session Recorder
-Comment=Record tmux terminal sessions so Claude Code can follow router CLI work in real time
-Comment[it]=Registra le sessioni tmux del terminale: Claude Code segue in tempo reale il lavoro sulla CLI del router
-Exec=terminal-router menu
+GenericName=AI-assisted Router Terminal
+Comment=Router terminal on the left, live Claude or Codex observer on the right
+Comment[it]=Router a sinistra, assistente Claude o Codex che segue gli output a destra
+Exec=terminal-router workspace
 Icon=terminal-router
 Terminal=true
 Categories=Network;X-SysLinuxOS-Networking;

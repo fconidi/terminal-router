@@ -3,6 +3,28 @@
 All notable changes to this project are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.2.0] - 2026-09-24
+
+### Added
+- Two-pane workspace: router/switch shell left, Claude/Codex observer right,
+  with automatic analysis and questions. Choose with `terminal-router claude`
+  or `terminal-router codex`.
+- Stable workspace log links across pause/resume. Each workspace has a dedicated
+  tmux server; only the router pane is captured, ignoring global hooks.
+- F9/F10 pause/resume recording even inside SSH; mouse pane selection and labels.
+- Observer batches changes, bounds recent context, avoids idle requests and stops
+  automatic requests on AI errors. Replies never become terminal input.
+- Status/doctor discover workspaces. Tests cover both simulated AI engines and
+  keyboard controls through a real tmux pseudoterminal client.
+
+### Changed
+- No-argument and desktop startup open the workspace. `menu` retains setup
+  options; `launch` retains the previous recording-only session.
+- Python 3 is now a runtime dependency, without third-party Python packages.
+- Workspace output is sent to the selected AI provider using the CLI account;
+  recording-only modes continue to keep logs local.
+- Updated the man page with workspace usage, observer commands and F9/F10.
+
 ## [1.1.1] - 2026-09-23
 
 ### Fixed

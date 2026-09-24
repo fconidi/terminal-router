@@ -1,3 +1,15 @@
+terminal-router (1.2.0) tirreno; urgency=medium
+
+  * Open a two-pane router and Claude/Codex workspace by default and from the
+    desktop entry; preserve recording-only launch and configuration menu.
+  * Add automatic analysis, questions, bounded context, error handling and
+    isolated workspace capture. Never send AI commands to the router.
+  * Add F9/F10 recording controls, mouse switching and workspace diagnostics.
+  * Add Python 3 runtime dependency and isolated engine/keyboard tests.
+  * Update the man page for the integrated workflow.
+
+ -- Franco Conidi <fconidi@gmail.com>  Thu, 24 Sep 2026 12:00:00 +0200
+
 terminal-router (1.1.1) tirreno; urgency=medium
 
   * Read the installation banner version from dpkg instead of the stale 1.0.7.

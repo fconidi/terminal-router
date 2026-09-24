@@ -25,6 +25,7 @@ gzip -n -9 -c "$WORKDIR/docs/changelog" > "$BUILD/usr/share/doc/terminal-router/
 
 # Perms
 chmod 644 "$BUILD/usr/share/terminal-router/common.sh"
+chmod 644 "$BUILD/usr/share/terminal-router/workspace.sh" "$BUILD/usr/share/terminal-router/observer.py"
 chmod 755 "$BUILD/usr/share/terminal-router/install.sh"
 chmod 755 "$BUILD/usr/bin/terminal-router"
 chmod 644 "$BUILD/usr/share/applications/terminal-router.desktop"
@@ -59,4 +60,4 @@ echo
 echo "Install on host:"
 echo "  sudo apt install $OUTPUT_DEB"
 echo
-echo "Then, as your normal user:  terminal-router install"
+echo "Then, as your normal user:  terminal-router"
