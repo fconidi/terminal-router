@@ -100,6 +100,11 @@ LINK="$FILE.latest"
 trap 'rm -f -- "$LINK"' EXIT
 ln -s "$FILE" "$LINK"
 mv -Tf "$LINK" "$LOGDIR/latest"
+if [ -n "${4:-}" ]; then
+    [[ "$4" =~ ^workspace-[a-zA-Z0-9]+$ ]] && [ -d "$LOGDIR/$4" ] || exit 1
+    ln -s "$FILE" "$LINK"
+    mv -Tf "$LINK" "$LOGDIR/$4/current"
+fi
 cat >> "$FILE"
 EOF
 chmod 700 "$LOGDIR/pipe-logger.sh"

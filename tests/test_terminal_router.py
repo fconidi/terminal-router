@@ -1,5 +1,7 @@
 """Integration tests: temporary HOME, fake crontab, private real tmux server."""
 import os
+import json
+import pty
 from pathlib import Path
 import shlex
 import shutil
@@ -26,13 +28,20 @@ class RouterTests(unittest.TestCase):
         self.bin = self.base / "bin"
         self.bin.mkdir()
         self.env = dict(os.environ, HOME=str(self.home), SHELL="/bin/bash",
-                        PATH=f"{self.bin}:{os.environ['PATH']}",
+                        PATH=f"{self.bin}:{os.defpath}",
                         TEST_SOCKET=str(self.base / "tmux.sock"),
                         TEST_CRON=str(self.base / "crontab"))
         self.env.pop("TMUX", None)
         self.env.pop("TMUX_PANE", None)
         self.script("crontab", 'case "$1" in\n-l) cat "$TEST_CRON" 2>/dev/null ;;\n-) cat > "$TEST_CRON" ;;\nesac\n')
-        self.script("tmux", f'if [ "$1" = attach ]; then exit 0; fi\nexec {shlex.quote(TMUX)} -S "$TEST_SOCKET" -f "$HOME/.tmux.conf" "$@"\n')
+        self.script("tmux", f'''socket="${{TMUX%%,*}}"
+socket="${{socket:-$TEST_SOCKET}}"
+config="$HOME/.tmux.conf"
+if [ "$1" = -S ]; then socket="$2"; shift 2; fi
+if [ "$1" = -f ]; then config="$2"; shift 2; fi
+if [ "$1" = attach ]; then exit 0; fi
+exec {shlex.quote(TMUX)} -S "$socket" -f "$config" "$@"
+''')
         self.addCleanup(self.stop_tmux)
         self.cli = self.bin / "terminal-router"
         self.cli.write_text(FRONTEND.read_text().replace(
@@ -60,8 +69,10 @@ class RouterTests(unittest.TestCase):
         return result
 
     def stop_tmux(self):
-        subprocess.run([TMUX, "-S", self.env["TEST_SOCKET"], "kill-server"],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        sockets = [self.env["TEST_SOCKET"], *self.home.glob(".claude-logs/workspace-*/tmux.sock")]
+        for socket in sockets:
+            subprocess.run([TMUX, "-S", str(socket), "kill-server"],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     def install(self, mode="logdir-only"):
         return self.run_cmd("bash", str(INSTALLER), mode)
@@ -117,6 +128,112 @@ class RouterTests(unittest.TestCase):
             self.assertEqual(log.read_text(), "router output\n")
         self.assertEqual(logger.parent.stat().st_mode & 0o777, 0o700)
         self.assertTrue((logger.parent / "latest").resolve().is_file())
+
+    def test_workspace_log_link_survives_other_panes_and_resumes(self):
+        self.install()
+        logs = self.home / ".claude-logs"
+        (logs / "workspace-test").mkdir(mode=0o700)
+        logger = logs / "pipe-logger.sh"
+        self.run_cmd(str(logger), "router", "0", "0", "workspace-test", input="FIRST\n")
+        current = logs / "workspace-test/current"
+        self.assertEqual(current.read_text(), "FIRST\n")
+        first = current.resolve()
+        self.run_cmd(str(logger), "other", "0", "0", input="UNRELATED\n")
+        self.assertEqual(current.resolve(), first)
+        self.run_cmd(str(logger), "router", "0", "0", "workspace-test", input="RESUMED\n")
+        self.assertNotEqual(current.resolve(), first)
+        self.assertEqual(current.read_text(), "RESUMED\n")
+
+    def test_workspace_opens_two_isolated_panes_with_only_router_logged(self):
+        self.consent()
+        self.script("claude", 'cat >/dev/null\nprintf "AI_STUB_REPLY\\n"\n')
+        original = (self.home / ".tmux.conf").read_bytes()
+        self.run_cmd(str(self.cli), "claude")
+        state, = (self.home / ".claude-logs").glob("workspace-*")
+        socket = str(state / "tmux.sock")
+        panes = self.run_cmd("tmux", "-S", socket, "list-panes", "-F", "#{pane_id} #{pane_left} #{pane_pipe} #{@terminal_router_role}").stdout.splitlines()
+        self.assertEqual(len(panes), 2, panes)
+        left, right = (line.split() for line in panes)
+        self.assertEqual(left[1:], ["0", "1", "router"])
+        self.assertEqual(right[2:], ["0", "assistant"])
+        self.assertGreater(int(right[1]), 0)
+        self.assertIn("assistant", self.run_cmd(str(self.cli), "doctor").stdout)
+        self.assertEqual(self.run_cmd("tmux", "-S", socket, "display-message", "-p", "#{pane_id}").stdout.strip(), left[0])
+        self.run_cmd("tmux", "-S", socket, "send-keys", "-t", left[0], "-l", "echo ROUTER_WORKSPACE_OUTPUT")
+        self.run_cmd("tmux", "-S", socket, "send-keys", "-t", left[0], "Enter")
+        self.wait_for(lambda: (state / "current").exists() and "ROUTER_WORKSPACE_OUTPUT" in (state / "current").read_text())
+        self.wait_for(lambda: "Router observer" in self.run_cmd("tmux", "-S", socket, "capture-pane", "-p", "-t", right[0]).stdout)
+        self.wait_for(lambda: "AI_STUB_REPLY" in self.run_cmd("tmux", "-S", socket, "capture-pane", "-p", "-t", right[0]).stdout)
+        self.assertNotIn("Router observer", (state / "current").read_text())
+        env = dict(self.env, TMUX=f"{socket},0,0", TMUX_PANE=left[0])
+        previous = (state / "current").resolve()
+        self.run_cmd(str(self.cli), "pause", env=env)
+        self.run_cmd(str(self.cli), "resume", env=env)
+        self.wait_for(lambda: (state / "current").resolve() != previous)
+        env["TMUX_PANE"] = right[0]
+        self.assertNotEqual(self.run_cmd(str(self.cli), "resume", env=env, check=False).returncode, 0)
+        self.assertEqual((self.home / ".tmux.conf").read_bytes(), original)
+        self.assertFalse((self.home / ".bashrc").exists())
+
+    def test_codex_workspace_automatically_reads_router_and_answers_questions(self):
+        self.consent()
+        self.script("codex", '''exec python3 -c 'import json,sys
+from pathlib import Path
+with Path("requests.jsonl").open("a") as output:
+    output.write(json.dumps({"args":sys.argv[1:], "prompt":sys.stdin.read()})+"\\n")
+print("CODEX_STUB_REPLY")' "$@"
+''')
+        self.run_cmd(str(self.cli))
+        state, = (self.home / ".claude-logs").glob("workspace-*")
+        socket = str(state / "tmux.sock")
+        left, right = self.run_cmd("tmux", "-S", socket, "list-panes", "-F", "#{pane_id}").stdout.splitlines()
+        for pane, command in ((left, "echo ROUTER_INTERFACE_DOWN"),):
+            self.run_cmd("tmux", "-S", socket, "send-keys", "-t", pane, "-l", command)
+            self.run_cmd("tmux", "-S", socket, "send-keys", "-t", pane, "Enter")
+        requests = state / "requests.jsonl"
+        self.wait_for(lambda: requests.exists())
+        first = json.loads(requests.read_text().splitlines()[0])
+        self.assertIn("ROUTER_INTERFACE_DOWN", first["prompt"])
+        self.assertIn("read-only", first["args"])
+        self.assertIn("--ignore-user-config", first["args"])
+        self.run_cmd("tmux", "-S", socket, "send-keys", "-t", right, "-l", "Perche la porta e down?")
+        self.run_cmd("tmux", "-S", socket, "send-keys", "-t", right, "Enter")
+        self.wait_for(lambda: len(requests.read_text().splitlines()) >= 2)
+        second = json.loads(requests.read_text().splitlines()[1])
+        self.assertIn("Perche la porta e down?", second["prompt"])
+        self.assertNotIn("CODEX_STUB_REPLY", (state / "current").read_text())
+
+    def test_missing_requested_engine_fails_before_creating_workspace(self):
+        self.script("claude", 'exit 99\n')
+        result = self.run_cmd(str(self.cli), "codex", check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("codex not found", result.stderr)
+        self.assertFalse((self.home / ".claude-logs").exists())
+
+    def test_workspace_function_keys_pause_and_resume_without_router_commands(self):
+        self.consent()
+        self.script("claude", 'cat >/dev/null\necho AI_REPLY\n')
+        self.run_cmd(str(self.cli), "claude")
+        state, = (self.home / ".claude-logs").glob("workspace-*")
+        socket = str(state / "tmux.sock")
+        left = self.run_cmd("tmux", "-S", socket, "display-message", "-p", "#{pane_id}").stdout.strip()
+        master, slave = pty.openpty()
+        client = subprocess.Popen([TMUX, "-S", socket, "attach"], stdin=slave, stdout=slave,
+                                  stderr=slave, env=dict(self.env, TERM="xterm"), start_new_session=True)
+        os.close(slave)
+        try:
+            self.wait_for(lambda: bool(self.run_cmd("tmux", "-S", socket, "list-clients").stdout.strip()))
+            self.wait_for(lambda: (state / "current").exists())
+            previous = (state / "current").resolve()
+            os.write(master, b"\x1b[20~")  # xterm F9
+            self.wait_for(lambda: self.run_cmd("tmux", "-S", socket, "display-message", "-p", "-t", left, "#{pane_pipe}").stdout.strip() == "0")
+            os.write(master, b"\x1b[21~")  # xterm F10
+            self.wait_for(lambda: self.run_cmd("tmux", "-S", socket, "display-message", "-p", "-t", left, "#{pane_pipe}").stdout.strip() == "1")
+            self.wait_for(lambda: (state / "current").resolve() != previous)
+        finally:
+            client.terminate()
+            client.wait(timeout=5)
+            os.close(master)
 
     def test_hook_treats_session_name_as_data(self):
         self.install("full")
@@ -200,7 +317,7 @@ class RouterTests(unittest.TestCase):
         pane = self.run_cmd("tmux", "display-message", "-p", "#{pane_id}").stdout.strip()
         self.run_cmd("tmux", "split-window")
         other = self.run_cmd("tmux", "display-message", "-p", "#{pane_id}").stdout.strip()
-        env = dict(self.env, TMUX="test", TMUX_PANE=pane)
+        env = dict(self.env, TMUX=f"{self.env['TEST_SOCKET']},0,0", TMUX_PANE=pane)
         self.run_cmd(str(self.cli), "pause", env=env)
         self.assertEqual(self.run_cmd("tmux", "display-message", "-p", "-t", pane, "#{pane_pipe}").stdout.strip(), "0")
         self.assertEqual(self.run_cmd("tmux", "display-message", "-p", "-t", other, "#{pane_pipe}").stdout.strip(), "1")

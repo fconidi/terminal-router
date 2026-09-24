@@ -11,10 +11,13 @@ case "$1" in
         echo "=================================================="
         echo "  Logging is opt-in; existing user setups are preserved."
         echo "  To enable logging:"
-        echo "    terminal-router install      every terminal (or the menu entry)"
+        echo "    terminal-router              router left, AI observer right"
+        echo "    terminal-router claude|codex  choose the AI engine explicitly"
+        echo "    terminal-router install      record every terminal"
         echo "    terminal-router launch        one session only, no dotfile edits"
         echo ""
         echo "  Status:  terminal-router status"
+        echo "  Setup:   terminal-router menu"
         echo "  Remove:  terminal-router remove"
         echo "  Docs:    man terminal-router"
         echo ""
@@ -24,6 +27,8 @@ case "$1" in
         echo "  Note: logs capture screen output, including secrets passed"
         echo "  as plaintext command-line arguments. Use terminal-router pause before"
         echo "  sensitive work."
+        echo "  The AI workspace sends captured output to your AI provider;"
+        echo "  normal account usage applies. :auto off pauses automatic analysis."
         echo ""
         ;;
 esac

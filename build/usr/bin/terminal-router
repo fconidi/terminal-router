@@ -9,7 +9,7 @@
 
 set -uo pipefail
 
-VERSION="1.1.1"
+VERSION="1.2.0"
 INSTALLER="/usr/share/terminal-router/install.sh"
 CONSENT="$HOME/.config/terminal-router/consent"
 source /usr/share/terminal-router/common.sh || exit 1
@@ -218,6 +218,14 @@ cmd_remove() {
     fi
 }
 
+workspace_panes() {
+    local socket
+    for socket in "$LOGDIR"/workspace-*/tmux.sock; do
+        [ -S "$socket" ] || continue
+        tmux -S "$socket" list-panes -a -F '  #{session_name}:#{window_index}.#{pane_index} (#{pane_id}) #{@terminal_router_role} pipe=#{pane_pipe}' 2>/dev/null || true
+    done
+}
+
 cmd_status() {
     echo "terminal-router $VERSION — status for user $(id -un)"
     echo
@@ -286,6 +294,8 @@ cmd_status() {
         echo
         echo "  tmux sessions:"
         tmux ls 2>/dev/null | sed 's/^/    /' || echo "    (none)"
+        echo "  integrated workspaces:"
+        workspace_panes
     fi
 }
 
@@ -310,6 +320,8 @@ cmd_pause() {
 
 cmd_resume() {
     require_pane
+    [ "$(tmux show-options -pqv -t "$TMUX_PANE" @terminal_router_role)" != assistant ] ||
+        die "the assistant pane is not recorded; resume from the router pane."
     [ -f "$CONSENT" ] || die "logging not enabled; run 'terminal-router launch' or 'terminal-router install' first."
     [ -x "$LOGDIR/pipe-logger.sh" ] || die "logger missing; re-run 'terminal-router install' or 'terminal-router launch'."
     local active
@@ -318,7 +330,7 @@ cmd_resume() {
         echo "[pane $TMUX_PANE already has an active pipe; unchanged]"
         return 0
     fi
-    tmux pipe-pane -o -t "$TMUX_PANE" 'exec "$HOME/.claude-logs/pipe-logger.sh" #{q:session_name} #I #P' ||
+    tmux pipe-pane -o -t "$TMUX_PANE" 'exec "$HOME/.claude-logs/pipe-logger.sh" #{q:session_name} #I #P #{q:@terminal_router_log_key}' ||
         die "could not resume this pane."
     echo "[logging resumed for pane $TMUX_PANE, new file]"
 }
@@ -368,7 +380,7 @@ cmd_doctor() {
     if ! command -v crontab >/dev/null 2>&1 || ! crontab -l 2>/dev/null | has_rotation; then
         echo "WARN  rotation not configured; install cron and re-run setup."
     fi
-    panes=$(tmux list-panes -a -F '  #{session_name}:#{window_index}.#{pane_index} (#{pane_id}) pipe=#{pane_pipe}' 2>/dev/null) || panes=""
+    panes=$({ tmux list-panes -a -F '  #{session_name}:#{window_index}.#{pane_index} (#{pane_id}) pipe=#{pane_pipe}' 2>/dev/null || true; workspace_panes; })
     if [ -n "$panes" ]; then
         echo "Live panes (pipe=1 means a pipe is open, not proof of disk writes):"
         printf '%s\n' "$panes"
@@ -393,8 +405,9 @@ cmd_menu() {
         fi
         echo "  3) Follow the live log"
         echo "  4) Show the security notice"
-        echo "  5) Launch a single logged session (this terminal only)"
+        echo "  5) Open router + AI workspace (two panes)"
         echo "  6) Diagnose logging and permissions"
+        echo "  7) Launch a single logged session without AI"
         echo "  q) Quit"
         echo
         read -rp "  Choice: " choice
@@ -404,8 +417,9 @@ cmd_menu() {
             2) cmd_remove ;;
             3) cmd_tail ;;
             4) show_warning ;;
-            5) cmd_launch ;;
+            5) source "${INSTALLER%/*}/workspace.sh"; cmd_workspace ;;
             6) cmd_doctor ;;
+            7) cmd_launch ;;
             q|Q|"") exit 0 ;;
             *) echo "  Unknown choice." ;;
         esac
@@ -417,14 +431,18 @@ cmd_menu() {
 
 cmd_help() {
     cat <<EOF
-terminal-router $VERSION — tmux session logger for Claude Code
+terminal-router $VERSION — router terminal with a live AI observer
 
 Records every interactive terminal to ~/.claude-logs so Claude Code can follow
 a live router CLI session (Cisco/Huawei over SSH) in real time. Claude reads the
 log and suggests; you stay the only one touching the device.
 
-Usage: terminal-router <command>
+Usage: terminal-router [claude|codex|command]
 
+  (no args) Open a two-pane workspace: router left, AI observer right
+  claude    Open the workspace with Claude Code
+  codex     Open the workspace with Codex
+  workspace [claude|codex]   Same integrated workspace
   install   Set up the shell and tmux hooks for the current user (every terminal)
   launch    Log only this terminal, one-shot — no ~/.bashrc/~/.zshrc/~/.tmux.conf edits
   remove    Remove them again (with backups) and optionally delete the logs
@@ -433,18 +451,22 @@ Usage: terminal-router <command>
   tail      Follow the most recent pane log
   pause     Suspend capture in the calling tmux pane
   resume    Resume capture in the calling pane (also works with launch)
-  menu      Interactive menu (used by the desktop entry)
+  menu      Configuration menu and alternate launch options
   help      This text
 
 Inside a logged pane: terminal-router pause / resume suspend and resume capture.
 After install, logpause / logresume are shortcuts. Detaching does not stop logging.
+In the AI pane: ask questions, Enter to analyse now, :auto off/on, :quit.
+Only router output is recorded and sent to the AI provider; account usage applies.
 
 Everything is per-user and lives in \$HOME. Never run this with sudo.
 See /usr/share/doc/terminal-router/README for details.
 EOF
 }
 
-case "${1:-menu}" in
+case "${1:-workspace}" in
+    workspace)      source "${INSTALLER%/*}/workspace.sh"; cmd_workspace "${2:-}" ;;
+    claude|codex)   source "${INSTALLER%/*}/workspace.sh"; cmd_workspace "$1" ;;
     install)        cmd_install ;;
     launch|single)  cmd_launch ;;
     remove|uninstall) cmd_remove ;;
