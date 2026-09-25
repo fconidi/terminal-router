@@ -3,6 +3,71 @@
 All notable changes to this project are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.3.6] - 2026-09-25
+
+### Fixed
+- `:auto off` now cancels the active AI request and clears queued questions, so
+  no delayed analyses or tips appear after automatic mode is disabled.
+
+## [1.3.5] - 2026-09-25
+
+### Fixed
+- The observer now reads up to the latest 128 KiB of router output without an
+  80-line cutoff, preserving the beginning of typical long command results.
+
+## [1.3.4] - 2026-09-25
+
+### Fixed
+- Pending AI command groups now remain confirmable for 120 seconds.
+- Automatic and queued AI analyses wait while confirmation is pending, keeping
+  the command list and one-time code visible and stable.
+
+## [1.3.3] - 2026-09-25
+
+### Fixed
+- In configuration mode, Claude/Codex command proposals are now staged
+  automatically instead of asking the operator to copy them into `:apply`.
+- A confirmed proposal can contain up to 32 validated commands; the complete
+  group is shown before one-time confirmation and sent to the router in order.
+
+## [1.3.2] - 2026-09-25
+
+### Fixed
+- The router and AI observer are visible side by side again.
+- Mouse selection is handled by tmux and confined to the selected pane, so
+  copied router commands do not include text from the observer.
+
+## [1.3.1] - 2026-09-25
+
+### Fixed
+- The router and AI observer now use separate tmux windows, so mouse selection
+  and copy operations cannot mix characters between terminals.
+
+## [1.3.0] - 2026-09-25
+
+### Added
+- Optional guarded configuration mode for the integrated workspace.
+- Manual `:apply` and one-time `:confirm` flow with expiry, retry limits and
+  transport checks before a command reaches `tio` or `ssh`.
+- F9 pause state now blocks confirmed configuration commands.
+
+## [1.2.2] - 2026-09-25
+
+### Fixed
+- The observer now follows the system locale instead of always displaying
+  Italian text.
+
+### Added
+- English, Italian, French, German and Spanish observer messages and prompts.
+- `TR_LANGUAGE` override with English fallback for unknown locales.
+
+## [1.2.1] - 2026-09-25
+
+### Added
+- `tio` is now a mandatory package dependency for serial-console access.
+- The integrated router pane shows example `tio` commands, device discovery
+  with `tio --list`, and common USB serial device alternatives.
+
 ## [1.2.0] - 2026-09-24
 
 ### Added

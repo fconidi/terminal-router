@@ -1,4 +1,4 @@
-.TH TERMINAL-ROUTER 1 "September 2026" "terminal-router 1.2.0" "SysLinuxOS Manual"
+.TH TERMINAL-ROUTER 1 "September 2026" "terminal-router 1.3.6" "SysLinuxOS Manual"
 .SH NAME
 terminal\-router \- record tmux terminal sessions for AI\-assisted router work
 .SH SYNOPSIS
@@ -9,14 +9,14 @@ terminal\-router \- record tmux terminal sessions for AI\-assisted router work
 .RI [ claude | codex ]
 .SH DESCRIPTION
 .B terminal\-router
-opens a two\-pane tmux workspace by default. The left pane is a normal shell
-for connecting to a router or switch. The right pane runs a Claude Code or
-Codex observer that automatically analyses new recorded output and answers
+opens a two\-pane tmux workspace by default. The router pane on the left is a
+normal shell for connecting to a router or switch. The observer pane on the right runs Claude
+Code or Codex and automatically analyses new recorded output and answers
 questions typed by the operator. No separate assistant terminal or manual log
 selection is required.
 .PP
-Each workspace uses a private tmux server and captures only the original left
-pane under
+Each workspace uses a private tmux server with side-by-side router and observer
+panes. tmux confines mouse selection to one pane. It captures only the router pane under
 .IR ~/.claude\-logs .
 The observer follows a workspace\-specific link across pause/resume; opening
 another workspace does not redirect it to another device or to its own output.
@@ -26,6 +26,22 @@ The intended workflow is an interactive SSH session on a Cisco or Huawei
 router. The assistant has no access to the device and never needs any: the
 operator types, the assistant reads the log and suggests, the operator decides
 what to run.
+.PP
+The router pane also displays a serial console hint using
+.BR tio .
+Use
+.B tio --list
+to find an adapter, then for a typical 9600 8N1 console run:
+.nf
+tio --baudrate 9600 --databits 8 --parity none --stopbits 1 --flow none /dev/ttyUSB0
+.fi
+Common alternatives are
+.I /dev/ttyACM0
+and stable paths under
+.IR /dev/serial/by-id/ .
+With tio defaults (115200 8N1, no flow control),
+.B tio /dev/ttyUSB0
+is sufficient. Press Ctrl-t q to exit tio.
 .PP
 All configuration is per\-user and confined to
 .IR $HOME .
@@ -45,8 +61,10 @@ read it.
 .TP
 .BR workspace " [claude|codex]"
 Open the integrated workspace. With no arguments, terminal\-router does the
-same. Automatic engine selection prefers Claude Code, then Codex. Click a pane
-to switch or use Ctrl\-b followed by an arrow key. Initial focus is on the router.
+same. Automatic engine selection prefers Claude Code, then Codex. Both panes
+remain visible; click a pane to focus it. Mouse selection is copied by tmux and
+can be pasted with Ctrl\-b ]. OSC 52 capable terminals also receive it in the
+system clipboard. Initial focus is on the router pane.
 .TP
 .BR claude ", " codex
 Open the workspace using exactly the named engine. A missing engine produces
@@ -121,7 +139,7 @@ Detach from tmux. Recording and the observer continue while detached.
 The launcher prints a workspace\-specific reattach command; its socket is at
 .IR ~/.claude\-logs/workspace\-ID/tmux.sock .
 .SH OBSERVER COMMANDS
-Type the following in the right pane:
+Type the following in the observer pane:
 .TP
 .I question
 Ask about the latest captured router output. Up to five questions can wait
@@ -131,11 +149,36 @@ while an AI request runs. Questions are not sent to the router as commands.
 Request an analysis immediately, including when automatic analysis is off.
 .TP
 .B :auto off
-Stop automatic AI requests; manual questions remain available. An already
-submitted request can still finish. This does not pause disk recording.
+Stop automatic AI requests, cancel the active request and clear queued questions.
+New manual questions typed afterwards remain available. This does not pause disk
+recording.
 .TP
 .B :auto on
 Enable automatic analysis, or retry after fixing a CLI/authentication error.
+.TP
+.B :config on
+Enable guarded router configuration mode for this observer session. It is
+disabled by default. When the operator asks the AI to apply or type commands,
+the complete structured proposal is staged automatically for review. Up to 32
+commands can be confirmed as one ordered group. The AI cannot bypass confirmation.
+.TP
+.B :config off
+Disable configuration mode and cancel any pending command.
+.TP
+.B :apply command
+Manually prepare one command for review as a fallback. The command is
+accepted only when the router pane is running tio or ssh in the foreground.
+Shell operators, control characters and newlines are rejected.
+.TP
+.B :confirm code
+After reviewing the complete ordered command group, confirm it with the displayed
+one-time code within 120 seconds. All validated commands are then sent to the
+router pane in order. New AI analyses wait while confirmation is pending. At
+most three incorrect codes are accepted. F9, a transport change or pane pause
+cancels the pending group.
+.TP
+.B :cancel
+Discard the pending command without sending anything.
 .TP
 .B :quit
 Close the observer. The router pane remains open and keeps its recording state.
@@ -145,10 +188,11 @@ continuous output, with a minimum ten\-second interval between requests. Model
 response time is additional. Unchanged output makes no new request. Only one
 request runs at a time, with a 120\-second timeout. Errors stop automatic mode.
 .PP
-Context is limited to the last 80 lines and 16 KiB of the router log, plus the
-previous exchange. It is not a complete session history. Pausing capture with
-F9 prevents new automatic analysis; a request already submitted may complete.
-Manual questions during pause use the last captured output.
+Context includes up to the latest 128 KiB of the router log, plus the previous
+exchange. There is no fixed line-count cutoff, so the beginning of typical long
+command results is preserved. It is not an unbounded session history. Pausing
+capture with F9 prevents new automatic analysis; a request already submitted
+may complete. Manual questions during pause use the last captured output.
 .SH SHELL FUNCTIONS
 After install, shell shortcuts delegate to the pause and resume commands.
 Inside a logged pane,
@@ -185,6 +229,19 @@ Optional Claude model override for the observer.
 .TP
 .B TR_CODEX_MODEL
 Optional Codex model override for the observer.
+.TP
+.B TR_LANGUAGE
+Observer language override: one of
+.BR en ,
+.BR it ,
+.BR fr ,
+.BR de
+or
+.BR es .
+Without this variable, the observer follows LC_ALL, LC_MESSAGES, LANG or
+LANGUAGE. Unknown and C locales use English. Set it to
+.B auto
+to restore automatic selection.
 .PP
 Without these variables the chosen CLI uses its default model. The observer
 retains CLI authentication, but disables shell tools and configured integrations
@@ -196,6 +253,13 @@ The integrated workspace sends captured output to the selected AI provider
 through the user's authenticated CLI. Normal account usage applies. AI replies
 are displayed as advice and are never executed or typed into the router pane.
 Recording\-only install/launch do not invoke an AI provider.
+.PP
+Configuration mode is disabled by default. AI command proposals are untrusted
+input: each line is validated, the complete ordered group is shown to the
+operator, and nothing is sent until the displayed :confirm code is entered.
+Up to 32 validated commands are sent to a foreground tio or ssh transport after
+confirmation. F9, a transport change, expiry or three failed codes cancel the
+entire group.
 .PP
 The log captures everything printed in the terminal. Passwords typed at an
 interactive prompt (sudo, SSH password authentication) are

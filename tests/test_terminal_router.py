@@ -3,6 +3,7 @@ import os
 import json
 import pty
 from pathlib import Path
+import re
 import shlex
 import shutil
 import signal
@@ -144,19 +145,24 @@ exec {shlex.quote(TMUX)} -S "$socket" -f "$config" "$@"
         self.assertNotEqual(current.resolve(), first)
         self.assertEqual(current.read_text(), "RESUMED\n")
 
-    def test_workspace_opens_two_isolated_panes_with_only_router_logged(self):
+    def test_workspace_shows_two_panes_and_confines_mouse_selection(self):
         self.consent()
         self.script("claude", 'cat >/dev/null\nprintf "AI_STUB_REPLY\\n"\n')
         original = (self.home / ".tmux.conf").read_bytes()
         self.run_cmd(str(self.cli), "claude")
         state, = (self.home / ".claude-logs").glob("workspace-*")
         socket = str(state / "tmux.sock")
-        panes = self.run_cmd("tmux", "-S", socket, "list-panes", "-F", "#{pane_id} #{pane_left} #{pane_pipe} #{@terminal_router_role}").stdout.splitlines()
+        panes = self.run_cmd(
+            "tmux", "-S", socket, "list-panes", "-F",
+            "#{pane_id} #{pane_left} #{pane_pipe} #{@terminal_router_role}").stdout.splitlines()
         self.assertEqual(len(panes), 2, panes)
         left, right = (line.split() for line in panes)
         self.assertEqual(left[1:], ["0", "1", "router"])
-        self.assertEqual(right[2:], ["0", "assistant"])
         self.assertGreater(int(right[1]), 0)
+        self.assertEqual(right[2:], ["0", "assistant"])
+        self.assertEqual(
+            self.run_cmd("tmux", "-S", socket, "show-options", "-v", "-t", left[0], "mouse").stdout.strip(),
+            "on")
         self.assertIn("assistant", self.run_cmd(str(self.cli), "doctor").stdout)
         self.assertEqual(self.run_cmd("tmux", "-S", socket, "display-message", "-p", "#{pane_id}").stdout.strip(), left[0])
         self.run_cmd("tmux", "-S", socket, "send-keys", "-t", left[0], "-l", "echo ROUTER_WORKSPACE_OUTPUT")
@@ -186,7 +192,9 @@ print("CODEX_STUB_REPLY")' "$@"
         self.run_cmd(str(self.cli))
         state, = (self.home / ".claude-logs").glob("workspace-*")
         socket = str(state / "tmux.sock")
-        left, right = self.run_cmd("tmux", "-S", socket, "list-panes", "-F", "#{pane_id}").stdout.splitlines()
+        left, right = self.run_cmd("tmux", "-S", socket, "list-panes", "-a", "-F", "#{window_name} #{pane_id}").stdout.splitlines()
+        left = left.split()[1]
+        right = right.split()[1]
         for pane, command in ((left, "echo ROUTER_INTERFACE_DOWN"),):
             self.run_cmd("tmux", "-S", socket, "send-keys", "-t", pane, "-l", command)
             self.run_cmd("tmux", "-S", socket, "send-keys", "-t", pane, "Enter")
@@ -202,6 +210,115 @@ print("CODEX_STUB_REPLY")' "$@"
         second = json.loads(requests.read_text().splitlines()[1])
         self.assertIn("Perche la porta e down?", second["prompt"])
         self.assertNotIn("CODEX_STUB_REPLY", (state / "current").read_text())
+
+    def test_auto_off_cancels_running_analysis_and_clears_queued_questions(self):
+        self.consent()
+        self.script("claude", '''exec python3 -c 'import signal,sys,time
+from pathlib import Path
+with Path("request-count").open("a") as output:
+    output.write("request\\n")
+def stop(*unused):
+    Path("cancelled").write_text("yes")
+    raise SystemExit(0)
+signal.signal(signal.SIGTERM, stop)
+sys.stdin.read()
+while True:
+    time.sleep(1)' "$@"
+''')
+        self.run_cmd(str(self.cli), "claude")
+        state, = (self.home / ".claude-logs").glob("workspace-*")
+        socket = str(state / "tmux.sock")
+        panes = self.run_cmd(
+            "tmux", "-S", socket, "list-panes", "-F",
+            "#{@terminal_router_role} #{pane_id}").stdout.splitlines()
+        right = next(line.split()[1] for line in panes if line.startswith("assistant "))
+        self.wait_for(lambda: (state / "request-count").exists())
+        self.run_cmd("tmux", "-S", socket, "send-keys", "-t", right, "-l", "queued question")
+        self.run_cmd("tmux", "-S", socket, "send-keys", "-t", right, "Enter")
+        self.wait_for(lambda: "question queued" in self.run_cmd(
+            "tmux", "-S", socket, "capture-pane", "-p", "-t", right).stdout)
+        self.run_cmd("tmux", "-S", socket, "send-keys", "-t", right, "-l", ":auto off")
+        self.run_cmd("tmux", "-S", socket, "send-keys", "-t", right, "Enter")
+        self.wait_for(lambda: (state / "cancelled").exists())
+        time.sleep(1)
+        self.assertEqual((state / "request-count").read_text().splitlines(), ["request"])
+        output = self.run_cmd("tmux", "-S", socket, "capture-pane", "-p", "-t", right).stdout
+        self.assertIn("running request canceled and queue cleared", output)
+
+    def test_configuration_mode_requires_confirmation_before_sending_command(self):
+        self.consent()
+        self.script("tio", 'exec -a tio bash -c \'while IFS= read -r line; do printf "TIO_RX:%s\\n" "$line"; done\'\n')
+        self.script("claude", 'cat >/dev/null\nprintf "AI_STUB_REPLY\\n"\n')
+        self.run_cmd(str(self.cli), "claude")
+        state, = (self.home / ".claude-logs").glob("workspace-*")
+        socket = str(state / "tmux.sock")
+        left, right = self.run_cmd("tmux", "-S", socket, "list-panes", "-a", "-F", "#{window_name} #{pane_id}").stdout.splitlines()
+        left = left.split()[1]
+        right = right.split()[1]
+        self.run_cmd("tmux", "-S", socket, "send-keys", "-t", left, "-l", "tio /dev/ttyUSB0")
+        self.run_cmd("tmux", "-S", socket, "send-keys", "-t", left, "Enter")
+        self.wait_for(lambda: self.run_cmd(
+            "tmux", "-S", socket, "display-message", "-p", "-t", left,
+            "#{pane_current_command}").stdout.strip() == "tio")
+        self.run_cmd("tmux", "-S", socket, "send-keys", "-t", right, "-l", ":auto off")
+        self.run_cmd("tmux", "-S", socket, "send-keys", "-t", right, "Enter")
+        self.run_cmd("tmux", "-S", socket, "send-keys", "-t", right, "-l", ":config on")
+        self.run_cmd("tmux", "-S", socket, "send-keys", "-t", right, "Enter")
+        self.wait_for(lambda: "configuration mode enabled" in self.run_cmd(
+            "tmux", "-S", socket, "capture-pane", "-p", "-t", right).stdout)
+        self.run_cmd("tmux", "-S", socket, "send-keys", "-t", right, "-l", ":apply echo CONFIG_SENT")
+        self.run_cmd("tmux", "-S", socket, "send-keys", "-t", right, "Enter")
+        self.wait_for(lambda: "Pending router commands:" in self.run_cmd(
+            "tmux", "-S", socket, "capture-pane", "-p", "-t", right).stdout)
+        output = self.run_cmd("tmux", "-S", socket, "capture-pane", "-p", "-t", right).stdout
+        match = re.search(r":confirm ([A-F0-9]{12})", output)
+        self.assertIsNotNone(match, output)
+        self.assertNotIn("TIO_RX:echo CONFIG_SENT", (state / "current").read_text())
+        self.run_cmd("tmux", "-S", socket, "send-keys", "-t", right, "-l", f":confirm {match.group(1)}")
+        self.run_cmd("tmux", "-S", socket, "send-keys", "-t", right, "Enter")
+        self.wait_for(lambda: "TIO_RX:echo CONFIG_SENT" in (state / "current").read_text())
+
+    def test_ai_proposal_is_staged_automatically_but_sent_only_after_confirmation(self):
+        self.consent()
+        self.script("tio", 'exec -a tio bash -c \'while IFS= read -r line; do printf "TIO_RX:%s\\n" "$line"; done\'\n')
+        self.script(
+            "claude",
+            'cat >/dev/null\nprintf "Proposed commands.\\nTERMINAL_ROUTER_COMMAND: echo AI_CONFIG_ONE\\nTERMINAL_ROUTER_COMMAND: echo AI_CONFIG_TWO\\n"\n')
+        self.run_cmd(str(self.cli), "claude")
+        state, = (self.home / ".claude-logs").glob("workspace-*")
+        socket = str(state / "tmux.sock")
+        left, right = self.run_cmd(
+            "tmux", "-S", socket, "list-panes", "-a", "-F",
+            "#{window_name} #{pane_id}").stdout.splitlines()
+        left = left.split()[1]
+        right = right.split()[1]
+        self.run_cmd("tmux", "-S", socket, "send-keys", "-t", left, "-l", "tio /dev/ttyUSB0")
+        self.run_cmd("tmux", "-S", socket, "send-keys", "-t", left, "Enter")
+        self.wait_for(lambda: self.run_cmd(
+            "tmux", "-S", socket, "display-message", "-p", "-t", left,
+            "#{pane_current_command}").stdout.strip() == "tio")
+        self.run_cmd("tmux", "-S", socket, "send-keys", "-t", right, "-l", ":auto off")
+        self.run_cmd("tmux", "-S", socket, "send-keys", "-t", right, "Enter")
+        self.run_cmd("tmux", "-S", socket, "send-keys", "-t", right, "-l", ":config on")
+        self.run_cmd("tmux", "-S", socket, "send-keys", "-t", right, "Enter")
+        self.run_cmd("tmux", "-S", socket, "send-keys", "-t", right, "-l", "scrivi tu il comando")
+        self.run_cmd("tmux", "-S", socket, "send-keys", "-t", right, "Enter")
+        self.wait_for(lambda: "Pending router commands:" in self.run_cmd(
+            "tmux", "-S", socket, "capture-pane", "-p", "-t", right).stdout)
+        output = self.run_cmd("tmux", "-S", socket, "capture-pane", "-p", "-t", right).stdout
+        match = re.search(r":confirm ([A-F0-9]{12})", output)
+        self.assertIsNotNone(match, output)
+        self.assertNotIn("TERMINAL_ROUTER_COMMAND:", output)
+        self.assertIn("within 120 seconds", output)
+        self.assertNotIn("TIO_RX:echo AI_CONFIG_ONE", (state / "current").read_text())
+        self.assertNotIn("TIO_RX:echo AI_CONFIG_TWO", (state / "current").read_text())
+        self.run_cmd("tmux", "-S", socket, "send-keys", "-t", right, "-l", f":confirm {match.group(1)}")
+        self.run_cmd("tmux", "-S", socket, "send-keys", "-t", right, "Enter")
+        self.wait_for(lambda: all(command in (state / "current").read_text() for command in (
+            "TIO_RX:echo AI_CONFIG_ONE", "TIO_RX:echo AI_CONFIG_TWO")))
+        router_output = (state / "current").read_text()
+        self.assertLess(router_output.index("TIO_RX:echo AI_CONFIG_ONE"),
+                        router_output.index("TIO_RX:echo AI_CONFIG_TWO"))
 
     def test_missing_requested_engine_fails_before_creating_workspace(self):
         self.script("claude", 'exit 99\n')
@@ -227,8 +344,10 @@ print("CODEX_STUB_REPLY")' "$@"
             previous = (state / "current").resolve()
             os.write(master, b"\x1b[20~")  # xterm F9
             self.wait_for(lambda: self.run_cmd("tmux", "-S", socket, "display-message", "-p", "-t", left, "#{pane_pipe}").stdout.strip() == "0")
+            self.assertEqual(self.run_cmd("tmux", "-S", socket, "display-message", "-p", "-t", left, "#{@terminal_router_config_blocked}").stdout.strip(), "1")
             os.write(master, b"\x1b[21~")  # xterm F10
             self.wait_for(lambda: self.run_cmd("tmux", "-S", socket, "display-message", "-p", "-t", left, "#{pane_pipe}").stdout.strip() == "1")
+            self.assertEqual(self.run_cmd("tmux", "-S", socket, "display-message", "-p", "-t", left, "#{@terminal_router_config_blocked}").stdout.strip(), "0")
             self.wait_for(lambda: (state / "current").resolve() != previous)
         finally:
             client.terminate()
@@ -390,6 +509,24 @@ print("CODEX_STUB_REPLY")' "$@"
 
 
 class PackagingTests(unittest.TestCase):
+    def test_tio_is_a_mandatory_dependency(self):
+        control = (ROOT / "build/DEBIAN/control").read_text()
+        depends = next(line.split(":", 1)[1] for line in control.splitlines()
+                       if line.startswith("Depends:"))
+        self.assertRegex(depends, r"(^|, )tio(?:,|$)")
+
+    def test_workspace_shows_tio_connection_hint(self):
+        script = ROOT / "build/usr/share/terminal-router/workspace.sh"
+        result = subprocess.run(
+            ["bash", "-c", f"source {shlex.quote(str(script))}; show_connection_hint"],
+            capture_output=True, text=True, check=True)
+        self.assertIn(
+            "tio --baudrate 9600 --databits 8 --parity none --stopbits 1 --flow none /dev/ttyUSB0",
+            result.stdout,
+        )
+        self.assertIn("tio --list", result.stdout)
+        self.assertIn("/dev/serial/by-id/", result.stdout)
+
     def test_installation_banner_uses_configured_package_version(self):
         with tempfile.TemporaryDirectory(prefix="terminal-router-postinst-") as directory:
             query = Path(directory) / "dpkg-query"
