@@ -1,3 +1,74 @@
+terminal-router (1.3.6) tirreno; urgency=medium
+
+  * Make :auto off cancel the active AI request and clear queued questions so
+    no delayed analyses or tips appear afterwards.
+
+ -- Franco Conidi <fconidi@gmail.com>  Fri, 25 Sep 2026 00:00:00 +0200
+
+terminal-router (1.3.5) tirreno; urgency=medium
+
+  * Read up to the latest 128 KiB of router output without an 80-line cutoff,
+    preserving the beginning of typical long command results.
+
+ -- Franco Conidi <fconidi@gmail.com>  Fri, 25 Sep 2026 00:00:00 +0200
+
+terminal-router (1.3.4) tirreno; urgency=medium
+
+  * Keep pending AI command groups available for confirmation for 120 seconds.
+  * Pause new AI analyses while confirmation is pending so the command list and
+    code remain visible.
+
+ -- Franco Conidi <fconidi@gmail.com>  Fri, 25 Sep 2026 00:00:00 +0200
+
+terminal-router (1.3.3) tirreno; urgency=medium
+
+  * Stage Claude/Codex command proposals automatically in configuration mode.
+  * Show and validate command groups before one-time confirmation, then send
+    every confirmed command to the router pane in order.
+
+ -- Franco Conidi <fconidi@gmail.com>  Fri, 25 Sep 2026 00:00:00 +0200
+
+terminal-router (1.3.2) tirreno; urgency=medium
+
+  * Show the router and AI observer side by side again.
+  * Confine mouse selection to one pane so copied commands do not include text
+    from the adjacent observer.
+
+ -- Franco Conidi <fconidi@gmail.com>  Fri, 25 Sep 2026 00:00:00 +0200
+
+terminal-router (1.3.1) tirreno; urgency=medium
+
+  * Put the router and AI observer in separate tmux windows so mouse selection
+    and copy operations remain independent.
+
+ -- Franco Conidi <fconidi@gmail.com>  Fri, 25 Sep 2026 00:00:00 +0200
+
+terminal-router (1.3.0) tirreno; urgency=medium
+
+  * Add optional guarded configuration mode to the integrated workspace.
+  * Require manual :apply plus a one-time :confirm code before sending one
+    validated command to an active tio or ssh transport.
+  * Block confirmed commands while F9 has paused the router pane.
+
+ -- Franco Conidi <fconidi@gmail.com>  Fri, 25 Sep 2026 00:00:00 +0200
+
+terminal-router (1.2.2) tirreno; urgency=medium
+
+  * Follow the system locale for observer messages and prompts instead of
+    always using Italian.
+  * Add English, Italian, French, German and Spanish translations plus the
+    TR_LANGUAGE override.
+
+ -- Franco Conidi <fconidi@gmail.com>  Fri, 25 Sep 2026 00:00:00 +0200
+
+terminal-router (1.2.1) tirreno; urgency=medium
+
+  * Add tio as a mandatory dependency for serial-console access.
+  * Show tio connection examples and common device alternatives in the
+    integrated router workspace.
+
+ -- Franco Conidi <fconidi@gmail.com>  Fri, 25 Sep 2026 00:00:00 +0200
+
 terminal-router (1.2.0) tirreno; urgency=medium
 
   * Open a two-pane router and Claude/Codex workspace by default and from the

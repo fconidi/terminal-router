@@ -14,28 +14,60 @@ to the selected provider using your CLI account.
 Integrated workspace (default since 1.2.0)
 -----------------------------------------
 
-  terminal-router          router/switch shell left, AI observer right
+  terminal-router          router/switch pane left, AI observer pane right
   terminal-router claude   explicitly select Claude Code
   terminal-router codex    explicitly select Codex
   terminal-router menu     configuration and alternate launch modes
 
-The desktop icon opens the workspace directly. Click either pane to focus it.
-Only the original router pane is recorded; the observer follows its dedicated
-log link across pause/resume, unaffected by other sessions. It never sends
-commands to the router. Use F9/F10 to pause/resume recording even inside SSH.
+The desktop icon opens the workspace directly. The router and observer remain
+visible side by side. tmux handles mouse selection inside one pane, copies it
+automatically, and pastes it with Ctrl+b ]; OSC 52 capable terminals also receive
+it in the system clipboard. Only the router pane is recorded; the observer follows its dedicated log link across
+pause/resume, unaffected by other sessions. It never sends commands to the
+router. Use F9/F10 to pause/resume recording even inside SSH.
 
-In the right pane: type a question, Enter to analyse now, :auto off / :auto on
+The router pane shows a serial-console hint for tio. Find the adapter with:
+
+  tio --list
+
+For a typical 9600 8N1 console, connect with:
+
+  tio --baudrate 9600 --databits 8 --parity none --stopbits 1 --flow none /dev/ttyUSB0
+
+Common alternatives are /dev/ttyACM0 and stable paths under
+/dev/serial/by-id/. With tio defaults (115200 8N1, no flow control),
+"tio /dev/ttyUSB0" is sufficient. Press Ctrl-t q to exit tio.
+
+The observer follows the system locale automatically and supports English,
+Italian, French, German and Spanish. Unknown and C locales use English. Set
+TR_LANGUAGE=en, it, fr, de or es to choose explicitly, or TR_LANGUAGE=auto
+to restore automatic selection.
+
+In the observer pane: type a question, Enter to analyse now, :auto off / :auto on
 for automatic analysis, :quit to close only the observer. New output is grouped
 for 2-5 seconds, with at least 10 seconds between automatic requests; model
-response time is additional. Unchanged output makes no request. Context is up
-to 80 lines / 16 KiB plus the previous exchange. Errors stop automatic requests.
+response time is additional. Unchanged output makes no request. Context includes
+up to the latest 128 KiB of router output plus the previous exchange, preserving
+the beginning of typical long command results. :auto off cancels the active
+request and clears queued questions; questions typed afterwards still work.
+Errors stop automatic requests.
+
+Configuration mode is disabled by default. Use :config on, then ask the AI to
+apply or type the commands. The observer validates and stages the complete
+ordered proposal automatically. Review it and type :confirm <code> within 120
+seconds to send all commands, or :cancel to discard them. New AI analyses wait
+while confirmation is pending. Up to 32 commands may be confirmed together;
+:apply <command> remains a manual one-command fallback.
+Only tio or ssh may be the active foreground transport. Shell operators,
+control characters and newlines are rejected, and F9 blocks sending while the
+router pane is paused. Use :config off to disable the mode.
 
 Output is sent to your AI provider using your authenticated CLI, with normal
 account usage. An already submitted request can finish after recording pauses.
 Detaching tmux does not stop recording or the observer. Reattach using:
   tmux -S ~/.claude-logs/workspace-ID/tmux.sock attach
 
-Requires Python 3 (standard library), tmux >= 3.0, and a current authenticated
+Requires tio, Python 3 (standard library), tmux >= 3.0, and a current authenticated
 Claude Code or Codex CLI. Optional models: TR_CLAUDE_MODEL / TR_CODEX_MODEL.
 The observer disables shell tools and configured integrations and ignores
 project configuration; Codex also uses read-only mode. Authentication is kept.

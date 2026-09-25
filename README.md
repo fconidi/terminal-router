@@ -1,10 +1,10 @@
 # terminal-router
 
-Opens an integrated two-pane terminal: **router/switch shell on the left,
-Claude Code or Codex observer on the right**. Connect to the device from the
-left pane; the right pane automatically reads its recorded output and explains
-what changes. Ask questions there without opening another terminal or telling
-the assistant which tmux log to read.
+Opens an integrated two-pane terminal: **a router/switch shell on the left and a
+Claude Code or Codex observer on the right**. Connect to the device from the router
+pane; the observer pane automatically reads its recorded output and
+explains what changes. Ask questions there without opening another terminal or
+telling the assistant which tmux log to read.
 
 The typical use case is an interactive SSH session on a Cisco or Huawei
 router: the assistant has no access to the device and never needs any. The
@@ -19,28 +19,65 @@ terminal-router claude   # explicitly choose Claude Code
 terminal-router codex    # explicitly choose Codex
 ```
 
+The router pane includes a serial-console hint for `tio`:
+
+```bash
+tio --list
+tio --baudrate 9600 --databits 8 --parity none --stopbits 1 --flow none /dev/ttyUSB0
+```
+
+Depending on the adapter, use `/dev/ttyACM0` or the stable device path under
+`/dev/serial/by-id/`. If the console uses tio's defaults (115200 8N1, no flow
+control), `tio /dev/ttyUSB0` is sufficient. Press `Ctrl-t q` to exit tio.
+
 The desktop entry opens this workspace directly. Each workspace has its own
-tmux server: only the left pane is recorded, and the observer follows a stable
-link specific to that workspace. Other workspaces and resumed capture do not
-redirect the assistant to a different device or to its own output.
-Click a pane to switch, or use Ctrl+b followed by an arrow key.
+tmux server: only the router pane is recorded, and the observer follows a
+stable link specific to that workspace. Other workspaces and resumed capture do
+not redirect the assistant to a different device or to its own output. Both
+panes stay visible; click either pane to focus it. Mouse selection is handled by
+tmux and remains inside that pane. The selection is copied automatically; use
+`Ctrl+b ]` to paste it. A terminal that supports OSC 52 also receives it in the
+system clipboard.
+
+The observer follows the system locale automatically. Supported languages are
+English, Italian, French, German and Spanish; unknown or `C` locales fall back
+to English. To choose a language explicitly, set `TR_LANGUAGE` to `en`, `it`,
+`fr`, `de` or `es`, for example `TR_LANGUAGE=it terminal-router`. Use
+`TR_LANGUAGE=auto` to return to automatic selection.
 
 - **F9 / F10:** pause/resume router recording, including while connected over SSH.
 - In the AI pane, type a question or press Enter to analyse the current output.
-- `:auto off` / `:auto on`: disable/enable automatic analysis. Questions still work.
+- `:auto off` / `:auto on`: disable/enable automatic analysis. Turning it off
+  cancels the active request and clears queued questions; new questions typed
+  afterwards still work.
+- `:config on` / `:config off`: enable/disable guarded router configuration mode.
+- Ask the AI to apply or type the commands. It stages every proposed command,
+  shows the complete ordered group, and waits for `:confirm <code>` before
+  sending anything to the router pane. Up to 32 commands can be confirmed as
+  one group. Use `:cancel` to discard it; `:apply <command>` remains a manual
+  fallback for one command.
 - `:quit`: close the observer; the router pane remains available.
 
 Automatic analysis groups updates after two quiet seconds (at most five seconds
 of continuous output), with at least ten seconds between automatic requests.
 AI response time is additional. Unchanged output makes no new request. Each
-request contains up to 80 recent lines / 16 KiB and the previous exchange, not
-the entire session history. AI errors stop automatic requests; fix CLI login
-or configuration and use `:auto on` to retry.
+request contains up to the latest 128 KiB of router output and the previous
+exchange. This preserves the beginning of typical long command results without
+sending an unbounded session history. AI errors stop automatic requests; fix
+CLI login or configuration and use `:auto on` to retry.
 
 Captured output is sent to the chosen AI provider through your authenticated
 CLI, with normal account usage. Replies are advice: the observer never types
 or executes commands in the router pane. Pausing capture prevents new automatic
 requests; a request already sent can still finish.
+
+Configuration mode is disabled by default and lasts only for the current
+observer. AI proposals are treated as untrusted input: every line is validated,
+the whole group is displayed, and nothing is sent until the operator enters the
+one-time confirmation code. Commands are accepted only when `tio` or `ssh` is
+the foreground transport; shell operators, control characters and newlines are
+rejected. A group expires after 120 seconds; new AI analyses wait while it is
+pending, and F9 blocks it while the router pane is paused.
 
 The existing global recording mode remains available with `terminal-router install`:
 
@@ -118,7 +155,8 @@ manually clean up with `rm ~/.claude-logs/tmux-*.log` when needed.
 
 ## Requirements
 
-`bash`, `tmux >= 3.0`, `python3` (standard library only). `cron` is recommended
+`bash`, `tmux >= 3.0`, `python3` (standard library only), and `tio`.
+`cron` is recommended
 for log rotation. Workspaces require a current, authenticated Claude Code or
 Codex CLI, found on PATH, in `~/.local/bin`, or under nvm. Recording-only commands
 still work without AI.
@@ -137,7 +175,7 @@ back to more permissive execution.
 git clone https://github.com/fconidi/terminal-router.git
 cd terminal-router
 bash build-deb.sh
-sudo apt install ./terminal-router_1.2.0_all.deb
+sudo apt install ./terminal-router_1.3.6_all.deb
 terminal-router           # as your normal user, not root
 ```
 

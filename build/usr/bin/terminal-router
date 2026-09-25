@@ -9,7 +9,7 @@
 
 set -uo pipefail
 
-VERSION="1.2.0"
+VERSION="1.3.6"
 INSTALLER="/usr/share/terminal-router/install.sh"
 CONSENT="$HOME/.config/terminal-router/consent"
 source /usr/share/terminal-router/common.sh || exit 1
@@ -439,7 +439,7 @@ log and suggests; you stay the only one touching the device.
 
 Usage: terminal-router [claude|codex|command]
 
-  (no args) Open a two-pane workspace: router left, AI observer right
+  (no args) Open two side-by-side panes: router and AI observer
   claude    Open the workspace with Claude Code
   codex     Open the workspace with Codex
   workspace [claude|codex]   Same integrated workspace
