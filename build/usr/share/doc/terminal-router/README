@@ -11,7 +11,7 @@ reads and suggests, you decide what to run. Recording-only modes keep the log lo
 to the selected provider using your CLI account.
 
 
-Integrated workspace (default since 1.2.0)
+Integrated workspace (default since 1.1.0)
 -----------------------------------------
 
   terminal-router          router/switch pane left, AI observer pane right

@@ -569,6 +569,22 @@ while True:
 
 
 class PackagingTests(unittest.TestCase):
+    def test_public_release_version_is_consistent(self):
+        control = (ROOT / "build/DEBIAN/control").read_text()
+        version = next(line.removeprefix("Version:").strip()
+                       for line in control.splitlines()
+                       if line.startswith("Version:"))
+        cli = (ROOT / "build/usr/bin/terminal-router").read_text()
+        manpage = (ROOT / "docs/terminal-router.1").read_text()
+        changelog = (ROOT / "CHANGELOG.md").read_text()
+        debian_changelog = (ROOT / "docs/changelog").read_text()
+        readme = (ROOT / "README.md").read_text()
+        self.assertIn(f'VERSION="{version}"', cli)
+        self.assertIn(f'"terminal-router {version}"', manpage.splitlines()[0])
+        self.assertEqual(changelog.split("## [", 1)[1].split("]", 1)[0], version)
+        self.assertTrue(debian_changelog.startswith(f"terminal-router ({version}) "))
+        self.assertIn(f"terminal-router_{version}_all.deb", readme)
+
     def test_desktop_launches_the_graphical_workspace_without_a_wrapper_terminal(self):
         desktop = (ROOT / "build/usr/share/applications/terminal-router.desktop").read_text()
         self.assertIn("Exec=terminal-router workspace-gui\n", desktop)

@@ -1,13 +1,13 @@
 a00740e88f4bc6cee7732805b38ba22a  etc/xdg/menus/applications-merged/terminal-router.menu
-1635b6a4b767a027eb19a3d726ee3184  usr/bin/terminal-router
+d408a7cf7a8050f97ec397d65cc06c33  usr/bin/terminal-router
 734572a378463a80975cbd3182b0f720  usr/share/applications/terminal-router.desktop
-a8a7967ab1c1ecba8aab34af4646f65c  usr/share/doc/terminal-router/README
-1687692d46993392b273f429524b6fb3  usr/share/doc/terminal-router/changelog.gz
+42b7c981370c577d5b9ee1121bb29270  usr/share/doc/terminal-router/README
+24b958c40a50f8eda337b4a5cd52cccc  usr/share/doc/terminal-router/changelog.gz
 fbd18c45ef4f5f36d3af152112860669  usr/share/doc/terminal-router/copyright
 0b7b731d01da3270f07a22f5ca9010dd  usr/share/icons/hicolor/128x128/apps/terminal-router.png
 a6c2c4db86448df00d47a544b76860e2  usr/share/icons/hicolor/256x256/apps/terminal-router.png
 5efd3efa712a3ee11effca4ae1f1faec  usr/share/icons/hicolor/48x48/apps/terminal-router.png
-7af3922eb3cc0c949af72c3b2db6fb75  usr/share/man/man1/terminal-router.1.gz
+2989d5ba4f65e2b389c95b75fc991a1e  usr/share/man/man1/terminal-router.1.gz
 1ee79ba989d5f0d38074dc1a7f8f726c  usr/share/terminal-router/common.sh
 894d3e79efa95e13a644aa7fc5b4ba3e  usr/share/terminal-router/install.sh
 3ba000c4376bd372d7df9f1380add942  usr/share/terminal-router/observer.py

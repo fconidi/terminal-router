@@ -1,8 +1,9 @@
 # Next ideas
 
-The 1.1.0 review delivered pane-level pause/resume, read-only diagnostics,
-safer capture and repeatable regression tests. The following are proposals,
-not commands implemented in this release.
+The 1.1.0 release delivered the integrated Claude/Codex workspace, guarded
+configuration, multilingual output, isolated terminal widgets, pane-level
+controls, safer capture and repeatable regression tests. The following are
+proposals beyond that release.
 
 1. **Choose a pane to follow.** Add `logs` and `tail --pane` so opening a
    second pane does not move the assistant away from the router being examined.
