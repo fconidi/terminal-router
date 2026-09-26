@@ -3,6 +3,12 @@
 All notable changes to this project are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.3.9] - 2026-09-26
+
+### Added
+- The router terminal startup banner now also shows `screen` and `picocom`
+  serial-console examples, while retaining `tio` as the recommended default.
+
 ## [1.3.8] - 2026-09-26
 
 ### Fixed

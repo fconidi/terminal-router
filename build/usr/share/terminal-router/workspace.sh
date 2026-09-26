@@ -10,9 +10,13 @@ resolve_assistant() {
 
 shell_quote() { printf "'%s'" "${1//\'/\'\\\'\'}"; }
 
-CONNECTION_HINT='Serial console connection (tio):
+CONNECTION_HINT='Serial console connection (recommended: tio):
   tio --list
   tio --baudrate 9600 --databits 8 --parity none --stopbits 1 --flow none /dev/ttyUSB0
+
+Alternative terminal programs (if installed):
+  screen /dev/ttyUSB0 9600
+  picocom --baud 9600 --databits 8 --parity n --stopbits 1 --flow n /dev/ttyUSB0
 
 Other common devices are /dev/ttyACM0 or /dev/serial/by-id/<device-name>.
 If the device uses tio defaults (115200 8N1, no flow control):

@@ -28,13 +28,19 @@ widget and cannot cross the divider. Only the router session is recorded; the ob
 pause/resume, unaffected by other sessions. It never sends commands to the
 router. Use F9/F10 to pause/resume recording even inside SSH.
 
-The router pane shows a serial-console hint for tio. Find the adapter with:
+The router pane shows serial-console hints for tio, screen and picocom. Tio is
+the recommended default. Find the adapter with:
 
   tio --list
 
 For a typical 9600 8N1 console, connect with:
 
   tio --baudrate 9600 --databits 8 --parity none --stopbits 1 --flow none /dev/ttyUSB0
+
+Alternative terminal programs, when installed:
+
+  screen /dev/ttyUSB0 9600
+  picocom --baud 9600 --databits 8 --parity n --stopbits 1 --flow n /dev/ttyUSB0
 
 Common alternatives are /dev/ttyACM0 and stable paths under
 /dev/serial/by-id/. With tio defaults (115200 8N1, no flow control),
