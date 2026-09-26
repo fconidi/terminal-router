@@ -35,6 +35,7 @@ class RouterTests(unittest.TestCase):
         self.env.pop("TMUX", None)
         self.env.pop("TMUX_PANE", None)
         self.script("crontab", 'case "$1" in\n-l) cat "$TEST_CRON" 2>/dev/null ;;\n-) cat > "$TEST_CRON" ;;\nesac\n')
+        self.script("terminator", 'printf "%s\\n" "$@" > "$HOME/terminator-args"\n')
         self.script("tmux", f'''socket="${{TMUX%%,*}}"
 socket="${{socket:-$TEST_SOCKET}}"
 config="$HOME/.tmux.conf"
@@ -91,6 +92,12 @@ exec {shlex.quote(TMUX)} -S "$socket" -f "$config" "$@"
             time.sleep(0.05)
         self.fail("timed out waiting for observable result")
 
+    def workspace_panes(self, socket):
+        lines = self.run_cmd(
+            "tmux", "-S", socket, "list-panes", "-a", "-F",
+            "#{@terminal_router_role} #{pane_id}").stdout.splitlines()
+        return dict(line.split() for line in lines)
+
     def test_installer_failure_reaches_cli(self):
         broken = self.script("broken-installer", "exit 23\n")
         self.cli.write_text(self.cli.read_text().replace(
@@ -101,6 +108,15 @@ exec {shlex.quote(TMUX)} -S "$socket" -f "$config" "$@"
                 result = self.run_cmd(str(self.cli), command, check=False)
                 self.assertNotEqual(result.returncode, 0)
         self.assertFalse((self.base / "tmux.sock").exists())
+
+    def test_graphical_launcher_opens_consent_in_a_terminal_on_first_run(self):
+        self.script("x-terminal-emulator", 'printf "%s\\n" "$@" > "$HOME/gui-setup-args"\n')
+        self.run_cmd(str(self.cli), "workspace-gui")
+        args = (self.home / "gui-setup-args").read_text().splitlines()
+        self.assertEqual(args[:3], ["-T", "Terminal Router setup", "-e"])
+        self.assertIn("terminal-router", args)
+        self.assertIn("workspace", args)
+        self.assertFalse((self.home / ".claude-logs").exists())
 
     def test_launch_respects_base_index_and_logs_only_its_session(self):
         self.consent()
@@ -145,7 +161,7 @@ exec {shlex.quote(TMUX)} -S "$socket" -f "$config" "$@"
         self.assertNotEqual(current.resolve(), first)
         self.assertEqual(current.read_text(), "RESUMED\n")
 
-    def test_workspace_shows_two_panes_and_confines_mouse_selection(self):
+    def test_workspace_uses_two_independent_terminal_widgets(self):
         self.consent()
         self.script("claude", 'cat >/dev/null\nprintf "AI_STUB_REPLY\\n"\n')
         original = (self.home / ".tmux.conf").read_bytes()
@@ -153,30 +169,27 @@ exec {shlex.quote(TMUX)} -S "$socket" -f "$config" "$@"
         state, = (self.home / ".claude-logs").glob("workspace-*")
         socket = str(state / "tmux.sock")
         panes = self.run_cmd(
-            "tmux", "-S", socket, "list-panes", "-F",
-            "#{pane_id} #{pane_left} #{pane_pipe} #{@terminal_router_role}").stdout.splitlines()
+            "tmux", "-S", socket, "list-panes", "-a", "-F",
+            "#{pane_id} #{session_name} #{pane_pipe} #{@terminal_router_role}").stdout.splitlines()
         self.assertEqual(len(panes), 2, panes)
-        left, right = (line.split() for line in panes)
-        self.assertEqual(left[1:], ["0", "1", "router"])
-        self.assertGreater(int(right[1]), 0)
+        pane_details = {parts[3]: parts for parts in map(str.split, panes)}
+        left, right = pane_details["router"], pane_details["assistant"]
+        self.assertNotEqual(left[1], right[1])
+        self.assertEqual(left[2:], ["1", "router"])
         self.assertEqual(right[2:], ["0", "assistant"])
-        self.assertEqual(
-            self.run_cmd("tmux", "-S", socket, "show-options", "-v", "-t", left[0], "mouse").stdout.strip(),
-            "on")
-        self.assertNotEqual(
-            self.run_cmd("tmux", "-S", socket, "list-keys", "-T", "root",
-                         "MouseDown3Pane", check=False).returncode,
-            0)
-        context_menu = self.run_cmd(
-            "tmux", "-S", socket, "list-keys", "-T", "root", "MouseUp3Pane").stdout
-        self.assertIn("display-menu", context_menu)
-        for table in ("copy-mode", "copy-mode-vi"):
-            copy_binding = self.run_cmd(
-                "tmux", "-S", socket, "list-keys", "-T", table,
-                "MouseDragEnd1Pane").stdout
-            self.assertIn("xclip -in -selection clipboard", copy_binding)
+        for pane in (left[0], right[0]):
+            self.assertEqual(self.run_cmd(
+                "tmux", "-S", socket, "show-options", "-v", "-t", pane,
+                "mouse").stdout.strip(), "off")
+        layout = json.loads((state / "terminator-layout.json").read_text())
+        terminals = layout["layout"]["terminal-router"]
+        self.assertEqual(len(terminals), 2)
+        self.assertTrue(terminals[0]["command"].endswith("/router-client.sh"))
+        self.assertTrue(terminals[1]["command"].endswith("/assistant-client.sh"))
+        terminator_args = (self.home / "terminator-args").read_text().splitlines()
+        self.assertIn("--config-json", terminator_args)
+        self.assertIn(str(state / "terminator-layout.json"), terminator_args)
         self.assertIn("assistant", self.run_cmd(str(self.cli), "doctor").stdout)
-        self.assertEqual(self.run_cmd("tmux", "-S", socket, "display-message", "-p", "#{pane_id}").stdout.strip(), left[0])
         self.run_cmd("tmux", "-S", socket, "send-keys", "-t", left[0], "-l", "echo ROUTER_WORKSPACE_OUTPUT")
         self.run_cmd("tmux", "-S", socket, "send-keys", "-t", left[0], "Enter")
         self.wait_for(lambda: (state / "current").exists() and "ROUTER_WORKSPACE_OUTPUT" in (state / "current").read_text())
@@ -193,6 +206,29 @@ exec {shlex.quote(TMUX)} -S "$socket" -f "$config" "$@"
         self.assertEqual((self.home / ".tmux.conf").read_bytes(), original)
         self.assertFalse((self.home / ".bashrc").exists())
 
+    def test_workspace_launch_is_independent_of_the_parent_terminal_emulator(self):
+        self.consent()
+        self.script("claude", 'cat >/dev/null\nprintf "AI_STUB_REPLY\\n"\n')
+        parent_environments = {
+            "mate": {"TERM": "xterm-256color", "COLORTERM": "truecolor",
+                     "MATE_DESKTOP_SESSION_ID": "test"},
+            "gnome": {"TERM": "xterm-256color", "COLORTERM": "truecolor",
+                      "GNOME_TERMINAL_SERVICE": ":1.test"},
+            "terminator": {"TERM": "xterm-256color", "COLORTERM": "truecolor",
+                           "TERMINATOR_UUID": "urn:uuid:test"},
+        }
+        for name, additions in parent_environments.items():
+            with self.subTest(parent=name):
+                before = set((self.home / ".claude-logs").glob("workspace-*"))
+                env = dict(self.env, **additions)
+                self.run_cmd(str(self.cli), "claude", env=env)
+                created = set((self.home / ".claude-logs").glob("workspace-*")) - before
+                self.assertEqual(len(created), 1)
+                state = created.pop()
+                layout = json.loads((state / "terminator-layout.json").read_text())
+                self.assertEqual(len(layout["layout"]["terminal-router"]), 2)
+                self.assertFalse(layout["layout"]["vertical"])
+
     def test_codex_workspace_automatically_reads_router_and_answers_questions(self):
         self.consent()
         self.script("codex", '''exec python3 -c 'import json,sys
@@ -204,9 +240,8 @@ print("CODEX_STUB_REPLY")' "$@"
         self.run_cmd(str(self.cli))
         state, = (self.home / ".claude-logs").glob("workspace-*")
         socket = str(state / "tmux.sock")
-        left, right = self.run_cmd("tmux", "-S", socket, "list-panes", "-a", "-F", "#{window_name} #{pane_id}").stdout.splitlines()
-        left = left.split()[1]
-        right = right.split()[1]
+        pane_by_role = self.workspace_panes(socket)
+        left, right = pane_by_role["router"], pane_by_role["assistant"]
         for pane, command in ((left, "echo ROUTER_INTERFACE_DOWN"),):
             self.run_cmd("tmux", "-S", socket, "send-keys", "-t", pane, "-l", command)
             self.run_cmd("tmux", "-S", socket, "send-keys", "-t", pane, "Enter")
@@ -240,10 +275,10 @@ while True:
         self.run_cmd(str(self.cli), "claude")
         state, = (self.home / ".claude-logs").glob("workspace-*")
         socket = str(state / "tmux.sock")
-        panes = self.run_cmd(
-            "tmux", "-S", socket, "list-panes", "-F",
-            "#{@terminal_router_role} #{pane_id}").stdout.splitlines()
-        right = next(line.split()[1] for line in panes if line.startswith("assistant "))
+        pane_by_role = self.workspace_panes(socket)
+        left, right = pane_by_role["router"], pane_by_role["assistant"]
+        self.run_cmd("tmux", "-S", socket, "send-keys", "-t", left, "-l", "echo AUTO_OFF_TEST")
+        self.run_cmd("tmux", "-S", socket, "send-keys", "-t", left, "Enter")
         self.wait_for(lambda: (state / "request-count").exists())
         self.run_cmd("tmux", "-S", socket, "send-keys", "-t", right, "-l", "queued question")
         self.run_cmd("tmux", "-S", socket, "send-keys", "-t", right, "Enter")
@@ -264,9 +299,8 @@ while True:
         self.run_cmd(str(self.cli), "claude")
         state, = (self.home / ".claude-logs").glob("workspace-*")
         socket = str(state / "tmux.sock")
-        left, right = self.run_cmd("tmux", "-S", socket, "list-panes", "-a", "-F", "#{window_name} #{pane_id}").stdout.splitlines()
-        left = left.split()[1]
-        right = right.split()[1]
+        pane_by_role = self.workspace_panes(socket)
+        left, right = pane_by_role["router"], pane_by_role["assistant"]
         self.run_cmd("tmux", "-S", socket, "send-keys", "-t", left, "-l", "tio /dev/ttyUSB0")
         self.run_cmd("tmux", "-S", socket, "send-keys", "-t", left, "Enter")
         self.wait_for(lambda: self.run_cmd(
@@ -299,11 +333,8 @@ while True:
         self.run_cmd(str(self.cli), "claude")
         state, = (self.home / ".claude-logs").glob("workspace-*")
         socket = str(state / "tmux.sock")
-        left, right = self.run_cmd(
-            "tmux", "-S", socket, "list-panes", "-a", "-F",
-            "#{window_name} #{pane_id}").stdout.splitlines()
-        left = left.split()[1]
-        right = right.split()[1]
+        pane_by_role = self.workspace_panes(socket)
+        left, right = pane_by_role["router"], pane_by_role["assistant"]
         self.run_cmd("tmux", "-S", socket, "send-keys", "-t", left, "-l", "tio /dev/ttyUSB0")
         self.run_cmd("tmux", "-S", socket, "send-keys", "-t", left, "Enter")
         self.wait_for(lambda: self.run_cmd(
@@ -345,9 +376,12 @@ while True:
         self.run_cmd(str(self.cli), "claude")
         state, = (self.home / ".claude-logs").glob("workspace-*")
         socket = str(state / "tmux.sock")
-        left = self.run_cmd("tmux", "-S", socket, "display-message", "-p", "#{pane_id}").stdout.strip()
+        left = self.workspace_panes(socket)["router"]
+        router_session = self.run_cmd(
+            "tmux", "-S", socket, "display-message", "-p", "-t", left,
+            "#{session_name}").stdout.strip()
         master, slave = pty.openpty()
-        client = subprocess.Popen([TMUX, "-S", socket, "attach"], stdin=slave, stdout=slave,
+        client = subprocess.Popen([TMUX, "-S", socket, "attach", "-t", router_session], stdin=slave, stdout=slave,
                                   stderr=slave, env=dict(self.env, TERM="xterm"), start_new_session=True)
         os.close(slave)
         try:
@@ -521,18 +555,23 @@ while True:
 
 
 class PackagingTests(unittest.TestCase):
+    def test_desktop_launches_the_graphical_workspace_without_a_wrapper_terminal(self):
+        desktop = (ROOT / "build/usr/share/applications/terminal-router.desktop").read_text()
+        self.assertIn("Exec=terminal-router workspace-gui\n", desktop)
+        self.assertIn("Terminal=false\n", desktop)
+
     def test_tio_is_a_mandatory_dependency(self):
         control = (ROOT / "build/DEBIAN/control").read_text()
         depends = next(line.split(":", 1)[1] for line in control.splitlines()
                        if line.startswith("Depends:"))
         self.assertRegex(depends, r"(^|, )tio(?:,|$)")
 
-    def test_xclip_is_a_mandatory_dependency(self):
+    def test_terminator_is_a_mandatory_dependency(self):
         control = (ROOT / "build/DEBIAN/control").read_text()
         depends = next(line.removeprefix("Depends:").strip()
                        for line in control.splitlines()
                        if line.startswith("Depends:"))
-        self.assertRegex(depends, r"(^|, )xclip(?:,|$)")
+        self.assertRegex(depends, r"(^|, )terminator(?:,|$)")
 
     def test_workspace_shows_tio_connection_hint(self):
         script = ROOT / "build/usr/share/terminal-router/workspace.sh"

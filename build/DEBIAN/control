@@ -1,11 +1,10 @@
 Package: terminal-router
-Version: 1.3.7
+Version: 1.3.8
 Section: net
 Priority: optional
 Architecture: all
-Depends: bash, tmux (>= 3.0), python3, tio, xclip
+Depends: bash, tmux (>= 3.0), python3, tio, terminator
 Recommends: cron
-Suggests: terminator
 Maintainer: Franco Conidi aka edmond <fconidi@gmail.com>
 Homepage: https://www.syslinuxos.com
 Description: Terminal Router - tmux session recorder for AI-assisted router work
@@ -19,10 +18,10 @@ Description: Terminal Router - tmux session recorder for AI-assisted router work
  decides what to run.
  .
  Features:
-  - Integrated workspace: router and live Claude/Codex observer panes side by side
+  - Independent Terminator widgets for router and live Claude/Codex observer
   - tio serial-console dependency and connection hint for USB adapters
-  - AI follows only the router pane, accepts questions and never sends commands
-  - Dedicated tmux server keeps the assistant pane out of captured logs
+  - AI follows only the router session, accepts questions and never sends commands
+  - Dedicated tmux server keeps the assistant session out of captured logs
   - Every interactive terminal enters its own tmux session automatically
   - "terminal-router launch" logs a single self-contained session instead,
     with no ~/.bashrc, ~/.zshrc or ~/.tmux.conf edits at all

@@ -6,7 +6,7 @@ such as Claude Code can follow live work on a network device CLI in real time
 without any access to the device itself.
 
 The intended workflow: you open an SSH session to a Cisco or Huawei router in
-one pane, the assistant reads ~/.claude-logs/latest in another. You type, it
+one terminal, while the assistant follows its dedicated log in another. You type, it
 reads and suggests, you decide what to run. Recording-only modes keep the log local; the AI workspace sends snapshots
 to the selected provider using your CLI account.
 
@@ -19,11 +19,12 @@ Integrated workspace (default since 1.2.0)
   terminal-router codex    explicitly select Codex
   terminal-router menu     configuration and alternate launch modes
 
-The desktop icon opens the workspace directly. The router and observer remain
-visible side by side. Drag without Shift: tmux keeps selection inside one pane
-and copies it directly to the system clipboard through xclip. Shift bypasses
-tmux and may select both panes. Right-click opens the pane menu on button
-release; Ctrl+b ] also pastes the tmux buffer. Only the router pane is recorded; the observer follows its dedicated log link across
+The desktop icon opens the workspace directly in Terminator. Launching the same
+command from MATE Terminal, GNOME Terminal or Terminator produces the same
+workspace. Router and observer
+remain visible in two independent terminal widgets backed by separate tmux
+sessions. Native selection, Shift-selection and context menus remain inside one
+widget and cannot cross the divider. Only the router session is recorded; the observer follows its dedicated log link across
 pause/resume, unaffected by other sessions. It never sends commands to the
 router. Use F9/F10 to pause/resume recording even inside SSH.
 
@@ -68,7 +69,7 @@ account usage. An already submitted request can finish after recording pauses.
 Detaching tmux does not stop recording or the observer. Reattach using:
   tmux -S ~/.claude-logs/workspace-ID/tmux.sock attach
 
-Requires tio, xclip, Python 3 (standard library), tmux >= 3.0, and a current authenticated
+Requires tio, Terminator, Python 3 (standard library), tmux >= 3.0, and a current authenticated
 Claude Code or Codex CLI. Optional models: TR_CLAUDE_MODEL / TR_CODEX_MODEL.
 The observer disables shell tools and configured integrations and ignores
 project configuration; Codex also uses read-only mode. Authentication is kept.
