@@ -382,18 +382,6 @@ This removes only managed shell/tmux blocks, preserving backups and unrelated
 configuration. APT package removal is separate: `sudo apt remove
 terminal-router`.
 
-## Syncing from syslinuxos-packages
-
-Day-to-day fixes happen in the `syslinuxos-packages` monorepo (which also
-builds and publishes the SysLinuxOS `.deb`). To pull those changes into
-this repo with full commit history via `git subtree`:
-
-```bash
-scripts/sync-from-monorepo.sh [path-to-syslinuxos-packages]
-```
-
-The 1.1.0 changes were developed in this standalone repository; reconcile them
-with the monorepo before the next sync to avoid restoring older code.
 
 ## Development
 
