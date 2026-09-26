@@ -1,3 +1,12 @@
+terminal-router (1.3.7) tirreno; urgency=medium
+
+  * Open the tmux pane menu on right-button release so touchpad two-finger taps
+    no longer dismiss it immediately.
+  * Copy mouse selections made without Shift directly to the system clipboard
+    through xclip and explain that Shift bypasses tmux pane boundaries.
+
+ -- Franco Conidi <fconidi@gmail.com>  Sat, 26 Sep 2026 00:00:00 +0200
+
 terminal-router (1.3.6) tirreno; urgency=medium
 
   * Make :auto off cancel the active AI request and clear queued questions so

@@ -27,6 +27,7 @@ cmd_workspace() {
     require_user
     [ -z "${TMUX:-}" ] || die "detach first (Ctrl+b d), then open terminal-router from a plain terminal."
     local engine="${1:-}" binary state socket session left right command router_command router_shell hook_for_binding
+    local clipboard_command='xclip -in -selection clipboard'
     local hook='exec "$HOME/.claude-logs/pipe-logger.sh" #{q:session_name} #I #P #{q:@terminal_router_log_key}'
     hook_for_binding=$(shell_quote "$hook")
     case "$engine" in
@@ -57,6 +58,17 @@ cmd_workspace() {
     command+=" $(shell_quote "${INSTALLER%/*}/observer.py") $(shell_quote "$engine")"
     command+=" $(shell_quote "$binary") $(shell_quote "$state") $(shell_quote "$left")"
     if ! tmux -S "$socket" set-option -t "$session" mouse on ||
+       ! tmux -S "$socket" unbind-key -T root MouseDown3Pane ||
+       ! tmux -S "$socket" bind-key -T root MouseUp3Pane \
+           display-menu -T '#[align=centre]#{@terminal_router_role}' -t = -x M -y M \
+           'Copy word' w 'set-buffer "#{q:mouse_word}" ; run-shell -b "tmux save-buffer - | xclip -in -selection clipboard"' \
+           'Copy line' l 'set-buffer "#{q:mouse_line}" ; run-shell -b "tmux save-buffer - | xclip -in -selection clipboard"' \
+           '' 'Paste' p 'paste-buffer -p' \
+           '' 'Zoom pane' z 'resize-pane -Z' ||
+       ! tmux -S "$socket" bind-key -T copy-mode MouseDragEnd1Pane \
+           send-keys -X copy-pipe-and-cancel "$clipboard_command" ||
+       ! tmux -S "$socket" bind-key -T copy-mode-vi MouseDragEnd1Pane \
+           send-keys -X copy-pipe-and-cancel "$clipboard_command" ||
        ! tmux -S "$socket" set-option -w -t "$left" pane-border-status top ||
        ! tmux -S "$socket" set-option -w -t "$left" pane-border-format ' #{@terminal_router_role} ' ||
        ! tmux -S "$socket" set-option -p -t "$left" @terminal_router_role router ||
@@ -73,7 +85,8 @@ cmd_workspace() {
         die "could not configure workspace; its tmux server was closed."
     fi
     echo "Router on the left; $engine observer on the right. Click a pane to switch."
-    echo "Mouse selection is confined to the active pane; Ctrl+b ] pastes the copied text."
+    echo "Drag without Shift to copy one pane directly to the system clipboard."
+    echo "Right-click opens the pane menu; Ctrl+b ] also pastes the tmux buffer."
     echo "Captured output is sent to your configured AI provider; normal account usage applies."
     echo "Detach: Ctrl+b d. Reattach: tmux -S $(shell_quote "$socket") attach"
     exec tmux -S "$socket" attach -t "$session"
