@@ -573,7 +573,7 @@ class PackagingTests(unittest.TestCase):
                        if line.startswith("Depends:"))
         self.assertRegex(depends, r"(^|, )terminator(?:,|$)")
 
-    def test_workspace_shows_tio_connection_hint(self):
+    def test_workspace_shows_serial_connection_hints(self):
         script = ROOT / "build/usr/share/terminal-router/workspace.sh"
         result = subprocess.run(
             ["bash", "-c", f"source {shlex.quote(str(script))}; show_connection_hint"],
@@ -583,6 +583,11 @@ class PackagingTests(unittest.TestCase):
             result.stdout,
         )
         self.assertIn("tio --list", result.stdout)
+        self.assertIn("screen /dev/ttyUSB0 9600", result.stdout)
+        self.assertIn(
+            "picocom --baud 9600 --databits 8 --parity n --stopbits 1 --flow n /dev/ttyUSB0",
+            result.stdout,
+        )
         self.assertIn("/dev/serial/by-id/", result.stdout)
 
     def test_installation_banner_uses_configured_package_version(self):

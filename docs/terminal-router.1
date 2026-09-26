@@ -1,4 +1,4 @@
-.TH TERMINAL-ROUTER 1 "September 2026" "terminal-router 1.3.8" "SysLinuxOS Manual"
+.TH TERMINAL-ROUTER 1 "September 2026" "terminal-router 1.3.9" "SysLinuxOS Manual"
 .SH NAME
 terminal\-router \- record tmux terminal sessions for AI\-assisted router work
 .SH SYNOPSIS
@@ -28,13 +28,19 @@ router. The assistant has no access to the device and never needs any: the
 operator types, the assistant reads the log and suggests, the operator decides
 what to run.
 .PP
-The router pane also displays a serial console hint using
-.BR tio .
+The router pane also displays serial console hints for
+.BR tio ,
+.BR screen
+and
+.BR picocom .
+Tio is the recommended default.
 Use
 .B tio --list
 to find an adapter, then for a typical 9600 8N1 console run:
 .nf
 tio --baudrate 9600 --databits 8 --parity none --stopbits 1 --flow none /dev/ttyUSB0
+screen /dev/ttyUSB0 9600
+picocom --baud 9600 --databits 8 --parity n --stopbits 1 --flow n /dev/ttyUSB0
 .fi
 Common alternatives are
 .I /dev/ttyACM0

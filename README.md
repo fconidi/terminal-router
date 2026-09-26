@@ -19,11 +19,14 @@ terminal-router claude   # explicitly choose Claude Code
 terminal-router codex    # explicitly choose Codex
 ```
 
-The router pane includes a serial-console hint for `tio`:
+The router pane includes serial-console hints for `tio`, `screen` and
+`picocom` (`tio` is the recommended default):
 
 ```bash
 tio --list
 tio --baudrate 9600 --databits 8 --parity none --stopbits 1 --flow none /dev/ttyUSB0
+screen /dev/ttyUSB0 9600
+picocom --baud 9600 --databits 8 --parity n --stopbits 1 --flow n /dev/ttyUSB0
 ```
 
 Depending on the adapter, use `/dev/ttyACM0` or the stable device path under
@@ -177,7 +180,7 @@ back to more permissive execution.
 git clone https://github.com/fconidi/terminal-router.git
 cd terminal-router
 bash build-deb.sh
-sudo apt install ./terminal-router_1.3.8_all.deb
+sudo apt install ./terminal-router_1.3.9_all.deb
 terminal-router           # as your normal user, not root
 ```
 
