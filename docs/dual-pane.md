@@ -1,7 +1,8 @@
 # Integrated router workspace
 
 Opening `terminal-router` (also from the desktop entry) creates a private tmux
-server with a router shell pane on the left and an AI observer pane on the right.
+server with separate router and observer sessions, displayed in two independent
+Terminator widgets on the left and right.
 `terminal-router claude` / `terminal-router codex` select the engine explicitly;
 automatic selection prefers Claude, then Codex. The existing `launch` command
 continues to provide capture without AI; configuration remains in `menu`.
@@ -45,9 +46,9 @@ timeouts. No third-party Python dependencies. Engine subprocesses receive the
 log snapshot through stdin, and their replies are displayed as text only.
 No forced model; optional TR_CLAUDE_MODEL / TR_CODEX_MODEL overrides.
 
-Acceptance: two side-by-side tmux panes, focus initially on the router, mouse
-selection without Shift confined to one pane and copied through xclip, a stable
-right-click menu opened on button release, router capture on/observer capture off, session isolation, stable logging across
+Acceptance: two side-by-side terminal widgets, focus initially on the router,
+native selection and context menus confined to one widget, router capture
+on/observer capture off, session isolation, stable logging across
 pause/resume, no terminal input injection, clean handling of missing engines,
 CLI failures and shutdown. Operator input must remain usable while AI runs.
 

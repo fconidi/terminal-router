@@ -3,6 +3,17 @@
 All notable changes to this project are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.3.8] - 2026-09-26
+
+### Fixed
+- Router and assistant now run in two independent Terminator widgets backed by
+  separate tmux sessions. Native selection and context menus are confined to
+  one side and can no longer include characters from the adjacent terminal.
+- The desktop launcher opens the graphical workspace directly without leaving
+  an unused MATE Terminal window behind.
+- Launching from MATE Terminal, GNOME Terminal or Terminator now produces the
+  same isolated two-widget workspace.
+
 ## [1.3.7] - 2026-09-26
 
 ### Fixed

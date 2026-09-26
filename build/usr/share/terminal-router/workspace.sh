@@ -26,8 +26,8 @@ show_connection_hint() {
 cmd_workspace() {
     require_user
     [ -z "${TMUX:-}" ] || die "detach first (Ctrl+b d), then open terminal-router from a plain terminal."
-    local engine="${1:-}" binary state socket session left right command router_command router_shell hook_for_binding
-    local clipboard_command='xclip -in -selection clipboard'
+    local engine="${1:-}" binary state socket router_session assistant_session left right command
+    local router_command router_shell hook_for_binding router_client assistant_client layout
     local hook='exec "$HOME/.claude-logs/pipe-logger.sh" #{q:session_name} #I #P #{q:@terminal_router_log_key}'
     hook_for_binding=$(shell_quote "$hook")
     case "$engine" in
@@ -40,16 +40,18 @@ cmd_workspace() {
         *) die "usage: terminal-router workspace [claude|codex]" ;;
     esac
     command -v python3 >/dev/null || die "python3 is required for the AI observer."
+    command -v terminator >/dev/null || die "terminator is required for independent router and assistant terminals."
     ensure_consent || return 1
     bash "$INSTALLER" logdir-only || return $?
     state=$(mktemp -d "$LOGDIR/workspace-XXXXXXXX") || return 1
     socket="$state/tmux.sock"
-    session="router-${state##*workspace-}"
+    router_session="router-${state##*workspace-}"
+    assistant_session="assistant-${state##*workspace-}"
     router_shell="${SHELL:-/bin/sh}"
     [ -x "$router_shell" ] || router_shell=/bin/sh
     router_command="printf '%s\\n' $(shell_quote "$CONNECTION_HINT"); exec $(shell_quote "$router_shell") -i"
     # In particular, ignore global logging hooks which would record the AI pane.
-    left=$(tmux -S "$socket" -f /dev/null new-session -d -s "$session" -n router -x 160 -y 40 -P -F '#{pane_id}' "$router_command") || {
+    left=$(tmux -S "$socket" -f /dev/null new-session -d -s "$router_session" -n router -x 96 -y 40 -P -F '#{pane_id}' "$router_command") || {
         rmdir "$state" 2>/dev/null || true
         die "could not create workspace."
     }
@@ -57,37 +59,64 @@ cmd_workspace() {
     command="export PATH=$(shell_quote "${binary%/*}:$PATH"); exec python3"
     command+=" $(shell_quote "${INSTALLER%/*}/observer.py") $(shell_quote "$engine")"
     command+=" $(shell_quote "$binary") $(shell_quote "$state") $(shell_quote "$left")"
-    if ! tmux -S "$socket" set-option -t "$session" mouse on ||
-       ! tmux -S "$socket" unbind-key -T root MouseDown3Pane ||
-       ! tmux -S "$socket" bind-key -T root MouseUp3Pane \
-           display-menu -T '#[align=centre]#{@terminal_router_role}' -t = -x M -y M \
-           'Copy word' w 'set-buffer "#{q:mouse_word}" ; run-shell -b "tmux save-buffer - | xclip -in -selection clipboard"' \
-           'Copy line' l 'set-buffer "#{q:mouse_line}" ; run-shell -b "tmux save-buffer - | xclip -in -selection clipboard"' \
-           '' 'Paste' p 'paste-buffer -p' \
-           '' 'Zoom pane' z 'resize-pane -Z' ||
-       ! tmux -S "$socket" bind-key -T copy-mode MouseDragEnd1Pane \
-           send-keys -X copy-pipe-and-cancel "$clipboard_command" ||
-       ! tmux -S "$socket" bind-key -T copy-mode-vi MouseDragEnd1Pane \
-           send-keys -X copy-pipe-and-cancel "$clipboard_command" ||
-       ! tmux -S "$socket" set-option -w -t "$left" pane-border-status top ||
-       ! tmux -S "$socket" set-option -w -t "$left" pane-border-format ' #{@terminal_router_role} ' ||
+    if ! tmux -S "$socket" set-option -t "$router_session" mouse off ||
+       ! tmux -S "$socket" set-option -t "$router_session" status-left ' router ' ||
        ! tmux -S "$socket" set-option -p -t "$left" @terminal_router_role router ||
        ! tmux -S "$socket" set-option -p -t "$left" @terminal_router_log_key "${state##*/}" ||
        ! tmux -S "$socket" set-option -p -t "$left" @terminal_router_config_blocked 0 ||
        ! tmux -S "$socket" pipe-pane -o -t "$left" "$hook" ||
        ! tmux -S "$socket" bind-key -n F9 "set-option -p -t $left @terminal_router_config_blocked 1; pipe-pane -t $left" ||
        ! tmux -S "$socket" bind-key -n F10 "set-option -p -t $left @terminal_router_config_blocked 0; pipe-pane -o -t $left $hook_for_binding" ||
-       ! tmux -S "$socket" set-option -t "$session" status-right ' F9 pausa | F10 riprendi ' ||
-       ! right=$(tmux -S "$socket" split-window -h -t "$left" -P -F '#{pane_id}' "$command") ||
-       ! tmux -S "$socket" set-option -p -t "$right" @terminal_router_role assistant ||
-       ! tmux -S "$socket" select-pane -t "$left"; then
+       ! tmux -S "$socket" set-option -t "$router_session" status-right ' F9 pausa | F10 riprendi ' ||
+       ! right=$(tmux -S "$socket" new-session -d -s "$assistant_session" -n assistant -x 72 -y 40 -P -F '#{pane_id}' "$command") ||
+       ! tmux -S "$socket" set-option -t "$assistant_session" mouse off ||
+       ! tmux -S "$socket" set-option -t "$assistant_session" status-left " $engine " ||
+       ! tmux -S "$socket" set-option -t "$assistant_session" status-right ' F9 pausa | F10 riprendi ' ||
+       ! tmux -S "$socket" set-option -p -t "$right" @terminal_router_role assistant; then
         tmux -S "$socket" kill-server 2>/dev/null || true
         die "could not configure workspace; its tmux server was closed."
     fi
-    echo "Router on the left; $engine observer on the right. Click a pane to switch."
-    echo "Drag without Shift to copy one pane directly to the system clipboard."
-    echo "Right-click opens the pane menu; Ctrl+b ] also pastes the tmux buffer."
+    router_client="$state/router-client.sh"
+    assistant_client="$state/assistant-client.sh"
+    layout="$state/terminator-layout.json"
+    {
+        echo '#!/bin/sh'
+        printf 'exec tmux -S %s attach -t %s\n' "$(shell_quote "$socket")" "$(shell_quote "$router_session")"
+    } > "$router_client"
+    {
+        echo '#!/bin/sh'
+        printf 'exec tmux -S %s attach -t %s\n' "$(shell_quote "$socket")" "$(shell_quote "$assistant_session")"
+    } > "$assistant_client"
+    chmod 700 "$router_client" "$assistant_client" || {
+        tmux -S "$socket" kill-server 2>/dev/null || true
+        die "could not prepare workspace clients."
+    }
+    python3 - "$layout" "$router_client" "$assistant_client" <<'PY' || {
+import json
+import sys
+
+layout_path, router_client, assistant_client = sys.argv[1:]
+layout = {
+    "layout": {
+        "vertical": False,
+        "terminal-router": [
+            {"command": router_client, "title": "router", "ratio": 0.58},
+            {"command": assistant_client, "title": "assistant"},
+        ],
+    }
+}
+with open(layout_path, "w", encoding="utf-8") as output:
+    json.dump(layout, output)
+PY
+        tmux -S "$socket" kill-server 2>/dev/null || true
+        die "could not prepare the Terminator layout."
+    }
+    chmod 600 "$layout" || {
+        tmux -S "$socket" kill-server 2>/dev/null || true
+        die "could not protect the Terminator layout."
+    }
+    echo "Router and $engine observer use independent Terminator widgets."
+    echo "Select and copy normally in either side; selection cannot cross the divider."
     echo "Captured output is sent to your configured AI provider; normal account usage applies."
-    echo "Detach: Ctrl+b d. Reattach: tmux -S $(shell_quote "$socket") attach"
-    exec tmux -S "$socket" attach -t "$session"
+    exec terminator --no-dbus --maximise --title 'Terminal Router' --config-json "$layout"
 }

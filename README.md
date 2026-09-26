@@ -1,8 +1,8 @@
 # terminal-router
 
-Opens an integrated two-pane terminal: **a router/switch shell on the left and a
-Claude Code or Codex observer on the right**. Connect to the device from the router
-pane; the observer pane automatically reads its recorded output and
+Opens two independent terminal widgets: **a router/switch shell on the left and
+a Claude Code or Codex observer on the right**. Connect to the device from the router
+terminal; the observer automatically reads its recorded output and
 explains what changes. Ask questions there without opening another terminal or
 telling the assistant which tmux log to read.
 
@@ -30,17 +30,16 @@ Depending on the adapter, use `/dev/ttyACM0` or the stable device path under
 `/dev/serial/by-id/`. If the console uses tio's defaults (115200 8N1, no flow
 control), `tio /dev/ttyUSB0` is sufficient. Press `Ctrl-t q` to exit tio.
 
-The desktop entry opens this workspace directly. Each workspace has its own
-tmux server: only the router pane is recorded, and the observer follows a
-stable link specific to that workspace. Other workspaces and resumed capture do
-not redirect the assistant to a different device or to its own output. Both
-panes stay visible; click either pane to focus it. Mouse selection is handled by
-tmux and remains inside that pane. Drag **without Shift**: releasing the button
-copies the selection directly to the system clipboard through `xclip`. Shift
-bypasses tmux in graphical terminals and may select across both panes. A
-right-click or touchpad two-finger tap opens the pane menu on button release, so
-the same click cannot immediately dismiss it. `Ctrl+b ]` also pastes the tmux
-buffer.
+The desktop entry opens this workspace directly in Terminator. The same command
+may be launched from MATE Terminal, GNOME Terminal or Terminator; the parent
+terminal does not affect the workspace. Router and
+observer use two independent terminal widgets and two separate tmux sessions on
+the workspace's private server. Only the router terminal is recorded, and the
+observer follows a stable link specific to that workspace. Other workspaces and
+resumed capture do not redirect the assistant to a different device or to its
+own output. Both terminals stay visible; click either side to focus it. Native
+selection, Shift-selection, copying and context menus stay inside that widget,
+so they cannot include text from the adjacent terminal.
 
 The observer follows the system locale automatically. Supported languages are
 English, Italian, French, German and Spanish; unknown or `C` locales fall back
@@ -158,7 +157,7 @@ manually clean up with `rm ~/.claude-logs/tmux-*.log` when needed.
 
 ## Requirements
 
-`bash`, `tmux >= 3.0`, `python3` (standard library only), `tio`, and `xclip`.
+`bash`, `tmux >= 3.0`, `python3` (standard library only), `tio`, and `terminator`.
 `cron` is recommended
 for log rotation. Workspaces require a current, authenticated Claude Code or
 Codex CLI, found on PATH, in `~/.local/bin`, or under nvm. Recording-only commands
@@ -178,7 +177,7 @@ back to more permissive execution.
 git clone https://github.com/fconidi/terminal-router.git
 cd terminal-router
 bash build-deb.sh
-sudo apt install ./terminal-router_1.3.7_all.deb
+sudo apt install ./terminal-router_1.3.8_all.deb
 terminal-router           # as your normal user, not root
 ```
 

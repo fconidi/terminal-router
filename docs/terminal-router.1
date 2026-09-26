@@ -1,4 +1,4 @@
-.TH TERMINAL-ROUTER 1 "September 2026" "terminal-router 1.3.7" "SysLinuxOS Manual"
+.TH TERMINAL-ROUTER 1 "September 2026" "terminal-router 1.3.8" "SysLinuxOS Manual"
 .SH NAME
 terminal\-router \- record tmux terminal sessions for AI\-assisted router work
 .SH SYNOPSIS
@@ -9,14 +9,15 @@ terminal\-router \- record tmux terminal sessions for AI\-assisted router work
 .RI [ claude | codex ]
 .SH DESCRIPTION
 .B terminal\-router
-opens a two\-pane tmux workspace by default. The router pane on the left is a
+opens a two\-terminal Terminator workspace by default. The router terminal on the left is a
 normal shell for connecting to a router or switch. The observer pane on the right runs Claude
 Code or Codex and automatically analyses new recorded output and answers
 questions typed by the operator. No separate assistant terminal or manual log
 selection is required.
 .PP
-Each workspace uses a private tmux server with side-by-side router and observer
-panes. tmux confines mouse selection to one pane. It captures only the router pane under
+Each workspace uses a private tmux server with separate router and observer
+sessions displayed in independent Terminator widgets. Native mouse selection
+and context menus remain inside one widget. It captures only the router session under
 .IR ~/.claude\-logs .
 The observer follows a workspace\-specific link across pause/resume; opening
 another workspace does not redirect it to another device or to its own output.
@@ -61,12 +62,12 @@ read it.
 .TP
 .BR workspace " [claude|codex]"
 Open the integrated workspace. With no arguments, terminal\-router does the
-same. Automatic engine selection prefers Claude Code, then Codex. Both panes
-remain visible; click a pane to focus it. Drag without Shift: tmux keeps the
-selection inside one pane and copies it to the system clipboard through xclip.
-Shift bypasses tmux and may select across both panes. Right-click opens the pane
-menu on button release. Ctrl\-b ] also pastes the tmux buffer. Initial focus is
-on the router pane.
+same. Automatic engine selection prefers Claude Code, then Codex. Both terminals
+remain visible; click one to focus it. Normal selection, Shift-selection,
+copying and context menus remain inside that terminal widget and cannot cross
+the divider. It may be launched from MATE Terminal, GNOME Terminal or
+Terminator; the parent terminal does not change the resulting workspace.
+Initial focus is on the router terminal.
 .TP
 .BR claude ", " codex
 Open the workspace using exactly the named engine. A missing engine produces

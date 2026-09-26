@@ -9,7 +9,7 @@
 
 set -uo pipefail
 
-VERSION="1.3.7"
+VERSION="1.3.8"
 INSTALLER="/usr/share/terminal-router/install.sh"
 CONSENT="$HOME/.config/terminal-router/consent"
 source /usr/share/terminal-router/common.sh || exit 1
@@ -429,6 +429,17 @@ cmd_menu() {
     done
 }
 
+cmd_workspace_gui() {
+    require_user
+    if [ ! -f "$CONSENT" ]; then
+        command -v x-terminal-emulator >/dev/null ||
+            die "open terminal-router from a terminal once to accept the security notice."
+        exec x-terminal-emulator -T 'Terminal Router setup' -e terminal-router workspace "${1:-}"
+    fi
+    source "${INSTALLER%/*}/workspace.sh"
+    cmd_workspace "${1:-}"
+}
+
 cmd_help() {
     cat <<EOF
 terminal-router $VERSION — router terminal with a live AI observer
@@ -466,6 +477,7 @@ EOF
 
 case "${1:-workspace}" in
     workspace)      source "${INSTALLER%/*}/workspace.sh"; cmd_workspace "${2:-}" ;;
+    workspace-gui)  cmd_workspace_gui "${2:-}" ;;
     claude|codex)   source "${INSTALLER%/*}/workspace.sh"; cmd_workspace "$1" ;;
     install)        cmd_install ;;
     launch|single)  cmd_launch ;;
