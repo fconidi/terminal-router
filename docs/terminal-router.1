@@ -1,4 +1,4 @@
-.TH TERMINAL-ROUTER 1 "September 2026" "terminal-router 1.3.9" "SysLinuxOS Manual"
+.TH TERMINAL-ROUTER 1 "September 2026" "terminal-router 1.3.10" "SysLinuxOS Manual"
 .SH NAME
 terminal\-router \- record tmux terminal sessions for AI\-assisted router work
 .SH SYNOPSIS
@@ -19,6 +19,9 @@ Each workspace uses a private tmux server with separate router and observer
 sessions displayed in independent Terminator widgets. Native mouse selection
 and context menus remain inside one widget. It captures only the router session under
 .IR ~/.claude\-logs .
+In the assistant widget, the mouse wheel browses up to 50,000 lines of tmux
+history instead of entering arrow-key escape sequences. Hold Shift while
+dragging for native terminal selection.
 The observer follows a workspace\-specific link across pause/resume; opening
 another workspace does not redirect it to another device or to its own output.
 User tmux configuration and global recording hooks are not loaded into this server.

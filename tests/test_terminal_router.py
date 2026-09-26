@@ -177,10 +177,24 @@ exec {shlex.quote(TMUX)} -S "$socket" -f "$config" "$@"
         self.assertNotEqual(left[1], right[1])
         self.assertEqual(left[2:], ["1", "router"])
         self.assertEqual(right[2:], ["0", "assistant"])
-        for pane in (left[0], right[0]):
-            self.assertEqual(self.run_cmd(
-                "tmux", "-S", socket, "show-options", "-v", "-t", pane,
-                "mouse").stdout.strip(), "off")
+        self.assertEqual(self.run_cmd(
+            "tmux", "-S", socket, "show-options", "-v", "-t", left[0],
+            "mouse").stdout.strip(), "off")
+        self.assertEqual(self.run_cmd(
+            "tmux", "-S", socket, "show-options", "-v", "-t", right[0],
+            "mouse").stdout.strip(), "on")
+        self.assertEqual(self.run_cmd(
+            "tmux", "-S", socket, "show-options", "-gwv", "history-limit",
+        ).stdout.strip(), "50000")
+        self.assertIn("Wheel: scroll", self.run_cmd(
+            "tmux", "-S", socket, "show-options", "-v", "-t", right[0],
+            "status-right").stdout)
+        self.assertNotEqual(self.run_cmd(
+            "tmux", "-S", socket, "list-keys", "-T", "root", "MouseDown3Pane",
+            check=False).returncode, 0)
+        self.assertIn("display-menu", self.run_cmd(
+            "tmux", "-S", socket, "list-keys", "-T", "root",
+            "MouseUp3Pane").stdout)
         layout = json.loads((state / "terminator-layout.json").read_text())
         terminals = layout["layout"]["terminal-router"]
         self.assertEqual(len(terminals), 2)

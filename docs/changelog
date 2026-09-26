@@ -1,3 +1,12 @@
+terminal-router (1.3.10) tirreno; urgency=medium
+
+  * Make the assistant mouse wheel browse a 50,000-line tmux history instead of
+    entering visible arrow-key escape sequences in the prompt.
+  * Keep Shift-drag native selection available and open the tmux context menu
+    on right-button release for reliable touchpad use.
+
+ -- Franco Conidi <fconidi@gmail.com>  Sat, 26 Sep 2026 00:00:00 +0200
+
 terminal-router (1.3.9) tirreno; urgency=medium
 
   * Show screen and picocom serial-console examples in the router terminal at
