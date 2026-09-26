@@ -163,6 +163,18 @@ exec {shlex.quote(TMUX)} -S "$socket" -f "$config" "$@"
         self.assertEqual(
             self.run_cmd("tmux", "-S", socket, "show-options", "-v", "-t", left[0], "mouse").stdout.strip(),
             "on")
+        self.assertNotEqual(
+            self.run_cmd("tmux", "-S", socket, "list-keys", "-T", "root",
+                         "MouseDown3Pane", check=False).returncode,
+            0)
+        context_menu = self.run_cmd(
+            "tmux", "-S", socket, "list-keys", "-T", "root", "MouseUp3Pane").stdout
+        self.assertIn("display-menu", context_menu)
+        for table in ("copy-mode", "copy-mode-vi"):
+            copy_binding = self.run_cmd(
+                "tmux", "-S", socket, "list-keys", "-T", table,
+                "MouseDragEnd1Pane").stdout
+            self.assertIn("xclip -in -selection clipboard", copy_binding)
         self.assertIn("assistant", self.run_cmd(str(self.cli), "doctor").stdout)
         self.assertEqual(self.run_cmd("tmux", "-S", socket, "display-message", "-p", "#{pane_id}").stdout.strip(), left[0])
         self.run_cmd("tmux", "-S", socket, "send-keys", "-t", left[0], "-l", "echo ROUTER_WORKSPACE_OUTPUT")
@@ -514,6 +526,13 @@ class PackagingTests(unittest.TestCase):
         depends = next(line.split(":", 1)[1] for line in control.splitlines()
                        if line.startswith("Depends:"))
         self.assertRegex(depends, r"(^|, )tio(?:,|$)")
+
+    def test_xclip_is_a_mandatory_dependency(self):
+        control = (ROOT / "build/DEBIAN/control").read_text()
+        depends = next(line.removeprefix("Depends:").strip()
+                       for line in control.splitlines()
+                       if line.startswith("Depends:"))
+        self.assertRegex(depends, r"(^|, )xclip(?:,|$)")
 
     def test_workspace_shows_tio_connection_hint(self):
         script = ROOT / "build/usr/share/terminal-router/workspace.sh"

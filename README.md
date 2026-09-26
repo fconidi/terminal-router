@@ -35,9 +35,12 @@ tmux server: only the router pane is recorded, and the observer follows a
 stable link specific to that workspace. Other workspaces and resumed capture do
 not redirect the assistant to a different device or to its own output. Both
 panes stay visible; click either pane to focus it. Mouse selection is handled by
-tmux and remains inside that pane. The selection is copied automatically; use
-`Ctrl+b ]` to paste it. A terminal that supports OSC 52 also receives it in the
-system clipboard.
+tmux and remains inside that pane. Drag **without Shift**: releasing the button
+copies the selection directly to the system clipboard through `xclip`. Shift
+bypasses tmux in graphical terminals and may select across both panes. A
+right-click or touchpad two-finger tap opens the pane menu on button release, so
+the same click cannot immediately dismiss it. `Ctrl+b ]` also pastes the tmux
+buffer.
 
 The observer follows the system locale automatically. Supported languages are
 English, Italian, French, German and Spanish; unknown or `C` locales fall back
@@ -155,7 +158,7 @@ manually clean up with `rm ~/.claude-logs/tmux-*.log` when needed.
 
 ## Requirements
 
-`bash`, `tmux >= 3.0`, `python3` (standard library only), and `tio`.
+`bash`, `tmux >= 3.0`, `python3` (standard library only), `tio`, and `xclip`.
 `cron` is recommended
 for log rotation. Workspaces require a current, authenticated Claude Code or
 Codex CLI, found on PATH, in `~/.local/bin`, or under nvm. Recording-only commands
@@ -175,7 +178,7 @@ back to more permissive execution.
 git clone https://github.com/fconidi/terminal-router.git
 cd terminal-router
 bash build-deb.sh
-sudo apt install ./terminal-router_1.3.6_all.deb
+sudo apt install ./terminal-router_1.3.7_all.deb
 terminal-router           # as your normal user, not root
 ```
 

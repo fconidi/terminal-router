@@ -1,9 +1,9 @@
 Package: terminal-router
-Version: 1.3.6
+Version: 1.3.7
 Section: net
 Priority: optional
 Architecture: all
-Depends: bash, tmux (>= 3.0), python3, tio
+Depends: bash, tmux (>= 3.0), python3, tio, xclip
 Recommends: cron
 Suggests: terminator
 Maintainer: Franco Conidi aka edmond <fconidi@gmail.com>

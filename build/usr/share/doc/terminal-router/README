@@ -20,9 +20,10 @@ Integrated workspace (default since 1.2.0)
   terminal-router menu     configuration and alternate launch modes
 
 The desktop icon opens the workspace directly. The router and observer remain
-visible side by side. tmux handles mouse selection inside one pane, copies it
-automatically, and pastes it with Ctrl+b ]; OSC 52 capable terminals also receive
-it in the system clipboard. Only the router pane is recorded; the observer follows its dedicated log link across
+visible side by side. Drag without Shift: tmux keeps selection inside one pane
+and copies it directly to the system clipboard through xclip. Shift bypasses
+tmux and may select both panes. Right-click opens the pane menu on button
+release; Ctrl+b ] also pastes the tmux buffer. Only the router pane is recorded; the observer follows its dedicated log link across
 pause/resume, unaffected by other sessions. It never sends commands to the
 router. Use F9/F10 to pause/resume recording even inside SSH.
 
@@ -67,7 +68,7 @@ account usage. An already submitted request can finish after recording pauses.
 Detaching tmux does not stop recording or the observer. Reattach using:
   tmux -S ~/.claude-logs/workspace-ID/tmux.sock attach
 
-Requires tio, Python 3 (standard library), tmux >= 3.0, and a current authenticated
+Requires tio, xclip, Python 3 (standard library), tmux >= 3.0, and a current authenticated
 Claude Code or Codex CLI. Optional models: TR_CLAUDE_MODEL / TR_CODEX_MODEL.
 The observer disables shell tools and configured integrations and ignores
 project configuration; Codex also uses read-only mode. Authentication is kept.

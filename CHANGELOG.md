@@ -3,6 +3,14 @@
 All notable changes to this project are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.3.7] - 2026-09-26
+
+### Fixed
+- The tmux pane menu now opens on right-button release, so a touchpad
+  two-finger tap no longer opens and immediately dismisses it.
+- Dragging without Shift copies only the selected pane directly to the system
+  clipboard through `xclip`. The workspace now states that Shift bypasses tmux.
+
 ## [1.3.6] - 2026-09-25
 
 ### Fixed
