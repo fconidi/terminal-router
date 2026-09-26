@@ -1,138 +1,17 @@
-terminal-router (1.3.10) tirreno; urgency=medium
-
-  * Make the assistant mouse wheel browse a 50,000-line tmux history instead of
-    entering visible arrow-key escape sequences in the prompt.
-  * Keep Shift-drag native selection available and open the tmux context menu
-    on right-button release for reliable touchpad use.
-
- -- Franco Conidi <fconidi@gmail.com>  Sat, 26 Sep 2026 00:00:00 +0200
-
-terminal-router (1.3.9) tirreno; urgency=medium
-
-  * Show screen and picocom serial-console examples in the router terminal at
-    startup, while retaining tio as the recommended default.
-
- -- Franco Conidi <fconidi@gmail.com>  Sat, 26 Sep 2026 00:00:00 +0200
-
-terminal-router (1.3.8) tirreno; urgency=medium
-
-  * Display router and observer in two independent Terminator widgets backed by
-    separate tmux sessions, preventing native selection from crossing sides.
-  * Open the graphical workspace directly from the desktop launcher without an
-    unused wrapper terminal.
-
- -- Franco Conidi <fconidi@gmail.com>  Sat, 26 Sep 2026 00:00:00 +0200
-
-terminal-router (1.3.7) tirreno; urgency=medium
-
-  * Open the tmux pane menu on right-button release so touchpad two-finger taps
-    no longer dismiss it immediately.
-  * Copy mouse selections made without Shift directly to the system clipboard
-    through xclip and explain that Shift bypasses tmux pane boundaries.
-
- -- Franco Conidi <fconidi@gmail.com>  Sat, 26 Sep 2026 00:00:00 +0200
-
-terminal-router (1.3.6) tirreno; urgency=medium
-
-  * Make :auto off cancel the active AI request and clear queued questions so
-    no delayed analyses or tips appear afterwards.
-
- -- Franco Conidi <fconidi@gmail.com>  Fri, 25 Sep 2026 00:00:00 +0200
-
-terminal-router (1.3.5) tirreno; urgency=medium
-
-  * Read up to the latest 128 KiB of router output without an 80-line cutoff,
-    preserving the beginning of typical long command results.
-
- -- Franco Conidi <fconidi@gmail.com>  Fri, 25 Sep 2026 00:00:00 +0200
-
-terminal-router (1.3.4) tirreno; urgency=medium
-
-  * Keep pending AI command groups available for confirmation for 120 seconds.
-  * Pause new AI analyses while confirmation is pending so the command list and
-    code remain visible.
-
- -- Franco Conidi <fconidi@gmail.com>  Fri, 25 Sep 2026 00:00:00 +0200
-
-terminal-router (1.3.3) tirreno; urgency=medium
-
-  * Stage Claude/Codex command proposals automatically in configuration mode.
-  * Show and validate command groups before one-time confirmation, then send
-    every confirmed command to the router pane in order.
-
- -- Franco Conidi <fconidi@gmail.com>  Fri, 25 Sep 2026 00:00:00 +0200
-
-terminal-router (1.3.2) tirreno; urgency=medium
-
-  * Show the router and AI observer side by side again.
-  * Confine mouse selection to one pane so copied commands do not include text
-    from the adjacent observer.
-
- -- Franco Conidi <fconidi@gmail.com>  Fri, 25 Sep 2026 00:00:00 +0200
-
-terminal-router (1.3.1) tirreno; urgency=medium
-
-  * Put the router and AI observer in separate tmux windows so mouse selection
-    and copy operations remain independent.
-
- -- Franco Conidi <fconidi@gmail.com>  Fri, 25 Sep 2026 00:00:00 +0200
-
-terminal-router (1.3.0) tirreno; urgency=medium
-
-  * Add optional guarded configuration mode to the integrated workspace.
-  * Require manual :apply plus a one-time :confirm code before sending one
-    validated command to an active tio or ssh transport.
-  * Block confirmed commands while F9 has paused the router pane.
-
- -- Franco Conidi <fconidi@gmail.com>  Fri, 25 Sep 2026 00:00:00 +0200
-
-terminal-router (1.2.2) tirreno; urgency=medium
-
-  * Follow the system locale for observer messages and prompts instead of
-    always using Italian.
-  * Add English, Italian, French, German and Spanish translations plus the
-    TR_LANGUAGE override.
-
- -- Franco Conidi <fconidi@gmail.com>  Fri, 25 Sep 2026 00:00:00 +0200
-
-terminal-router (1.2.1) tirreno; urgency=medium
-
-  * Add tio as a mandatory dependency for serial-console access.
-  * Show tio connection examples and common device alternatives in the
-    integrated router workspace.
-
- -- Franco Conidi <fconidi@gmail.com>  Fri, 25 Sep 2026 00:00:00 +0200
-
-terminal-router (1.2.0) tirreno; urgency=medium
-
-  * Open a two-pane router and Claude/Codex workspace by default and from the
-    desktop entry; preserve recording-only launch and configuration menu.
-  * Add automatic analysis, questions, bounded context, error handling and
-    isolated workspace capture. Never send AI commands to the router.
-  * Add F9/F10 recording controls, mouse switching and workspace diagnostics.
-  * Add Python 3 runtime dependency and isolated engine/keyboard tests.
-  * Update the man page for the integrated workflow.
-
- -- Franco Conidi <fconidi@gmail.com>  Thu, 24 Sep 2026 12:00:00 +0200
-
-terminal-router (1.1.1) tirreno; urgency=medium
-
-  * Read the installation banner version from dpkg instead of the stale 1.0.7.
-  * Clarify the upgrade notice and add a banner regression test.
-
- -- Franco Conidi <fconidi@gmail.com>  Wed, 23 Sep 2026 22:00:00 +0200
-
 terminal-router (1.1.0) tirreno; urgency=medium
 
-  * Add pane-level pause/resume and read-only doctor diagnostics.
-  * Quote shell arguments, sanitize log names, use unique private files and
-    atomically replace the latest symlink.
-  * Fix launch with nonzero window indices and propagate setup failures.
-  * Follow latest changes, update marked blocks with backups, preserve
-    unrelated cron jobs and handle spaces in HOME.
-  * Add isolated integration tests and editable documentation sources.
+  * Add an integrated router and Claude/Codex workspace in two independent
+    Terminator widgets backed by isolated tmux sessions.
+  * Add automatic analysis, questions, five languages and guarded command
+    configuration with one-time operator confirmation.
+  * Add F9/F10 recording controls, pane pause/resume, doctor diagnostics and
+    serial-console hints for tio, screen and picocom.
+  * Keep router selection native and isolated; add 50,000 lines of scrollable
+    assistant history with Shift-drag native selection.
+  * Harden logging, setup, cleanup and cron handling; add isolated regression
+    tests for tmux, both AI engines, packaging and workspace controls.
 
- -- Franco Conidi <fconidi@gmail.com>  Wed, 23 Sep 2026 21:00:00 +0200
+ -- Franco Conidi <fconidi@gmail.com>  Sat, 26 Sep 2026 00:00:00 +0200
 
 terminal-router (1.0.7) tirreno; urgency=medium
 

@@ -183,7 +183,7 @@ back to more permissive execution.
 git clone https://github.com/fconidi/terminal-router.git
 cd terminal-router
 bash build-deb.sh
-sudo apt install ./terminal-router_1.3.10_all.deb
+sudo apt install ./terminal-router_1.1.0_all.deb
 terminal-router           # as your normal user, not root
 ```
 
@@ -214,7 +214,7 @@ this repo with full commit history via `git subtree`:
 scripts/sync-from-monorepo.sh [path-to-syslinuxos-packages]
 ```
 
-The 1.1.x and 1.2.0 changes were developed in this standalone repository; reconcile them
+The 1.1.0 changes were developed in this standalone repository; reconcile them
 with the monorepo before the next sync to avoid restoring older code.
 
 ## Development checks
