@@ -71,11 +71,17 @@ cmd_workspace() {
        ! tmux -S "$socket" pipe-pane -o -t "$left" "$hook" ||
        ! tmux -S "$socket" bind-key -n F9 "set-option -p -t $left @terminal_router_config_blocked 1; pipe-pane -t $left" ||
        ! tmux -S "$socket" bind-key -n F10 "set-option -p -t $left @terminal_router_config_blocked 0; pipe-pane -o -t $left $hook_for_binding" ||
-       ! tmux -S "$socket" set-option -t "$router_session" status-right ' F9 pausa | F10 riprendi ' ||
+       ! tmux -S "$socket" set-option -t "$router_session" status-right ' F9 pause | F10 resume ' ||
+       ! tmux -S "$socket" set-option -g history-limit 50000 ||
        ! right=$(tmux -S "$socket" new-session -d -s "$assistant_session" -n assistant -x 72 -y 40 -P -F '#{pane_id}' "$command") ||
-       ! tmux -S "$socket" set-option -t "$assistant_session" mouse off ||
+       ! tmux -S "$socket" set-option -t "$assistant_session" mouse on ||
+       ! tmux -S "$socket" unbind-key -T root MouseDown3Pane ||
+       ! tmux -S "$socket" bind-key -T root MouseUp3Pane \
+           display-menu -T '#[align=centre]assistant' -t = -x M -y M \
+           'History top' '<' 'copy-mode ; send-keys -X history-top' \
+           'History bottom' '>' 'copy-mode ; send-keys -X history-bottom' ||
        ! tmux -S "$socket" set-option -t "$assistant_session" status-left " $engine " ||
-       ! tmux -S "$socket" set-option -t "$assistant_session" status-right ' F9 pausa | F10 riprendi ' ||
+       ! tmux -S "$socket" set-option -t "$assistant_session" status-right ' Wheel: scroll | Shift: select | F9 pause | F10 resume ' ||
        ! tmux -S "$socket" set-option -p -t "$right" @terminal_router_role assistant; then
         tmux -S "$socket" kill-server 2>/dev/null || true
         die "could not configure workspace; its tmux server was closed."
@@ -120,7 +126,8 @@ PY
         die "could not protect the Terminator layout."
     }
     echo "Router and $engine observer use independent Terminator widgets."
-    echo "Select and copy normally in either side; selection cannot cross the divider."
+    echo "Router: select normally. Assistant: wheel scrolls history; hold Shift to select."
+    echo "Selection cannot cross the divider."
     echo "Captured output is sent to your configured AI provider; normal account usage applies."
     exec terminator --no-dbus --maximise --title 'Terminal Router' --config-json "$layout"
 }

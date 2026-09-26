@@ -3,6 +3,16 @@
 All notable changes to this project are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.3.10] - 2026-09-26
+
+### Fixed
+- The mouse wheel in the assistant terminal now opens tmux history instead of
+  entering visible arrow-key escape sequences into the question prompt.
+- The assistant keeps 50,000 lines of scrollback, and its status bar documents
+  wheel scrolling and Shift-drag native selection.
+- The tmux context menu opens on right-button release so touchpad taps remain
+  usable while assistant mouse handling is active.
+
 ## [1.3.9] - 2026-09-26
 
 ### Added

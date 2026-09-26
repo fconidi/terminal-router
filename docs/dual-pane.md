@@ -18,11 +18,17 @@ F9/F10 control the router pipe directly, including inside an SSH session.
 Output is sent through the chosen, already-authenticated AI CLI; normal account
 usage applies. Tests replace both engines and never use a real AI account.
 
-The router pane shows a serial-console hint for `tio`. Use `tio --list` to find
-the adapter, then connect with `tio --baudrate 9600 --databits 8 --parity none
---stopbits 1 --flow none /dev/ttyUSB0`; `/dev/ttyACM0` and
+The router pane shows serial-console hints for `tio`, `screen` and `picocom`,
+with `tio` as the recommended default. Use `tio --list` to find the adapter,
+then connect with `tio --baudrate 9600 --databits 8 --parity none --stopbits 1
+--flow none /dev/ttyUSB0`; `/dev/ttyACM0` and
 `/dev/serial/by-id/` are common alternatives. With tio defaults, `tio
 /dev/ttyUSB0` is enough. Press `Ctrl-t q` to exit.
+
+The assistant session captures the mouse wheel so it can browse up to 50,000
+lines of tmux history. This prevents wheel events from appearing as arrow-key
+escape sequences in the question prompt. Hold Shift while dragging for native
+Terminator selection; the independent widgets keep that selection on one side.
 
 The observer selects the language from the system locale automatically and
 supports English, Italian, French, German and Spanish. Unknown and `C` locales
@@ -47,7 +53,8 @@ log snapshot through stdin, and their replies are displayed as text only.
 No forced model; optional TR_CLAUDE_MODEL / TR_CODEX_MODEL overrides.
 
 Acceptance: two side-by-side terminal widgets, focus initially on the router,
-native selection and context menus confined to one widget, router capture
+scrollable assistant history, native selection and context menus confined to
+one widget, router capture
 on/observer capture off, session isolation, stable logging across
 pause/resume, no terminal input injection, clean handling of missing engines,
 CLI failures and shutdown. Operator input must remain usable while AI runs.

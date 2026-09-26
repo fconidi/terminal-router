@@ -42,7 +42,10 @@ observer follows a stable link specific to that workspace. Other workspaces and
 resumed capture do not redirect the assistant to a different device or to its
 own output. Both terminals stay visible; click either side to focus it. Native
 selection, Shift-selection, copying and context menus stay inside that widget,
-so they cannot include text from the adjacent terminal.
+so they cannot include text from the adjacent terminal. In the assistant
+widget, use the mouse wheel to browse up to 50,000 lines of tmux history and
+Shift-drag for native text selection. Scrolling no longer enters arrow-key
+escape sequences in the assistant prompt.
 
 The observer follows the system locale automatically. Supported languages are
 English, Italian, French, German and Spanish; unknown or `C` locales fall back
@@ -180,7 +183,7 @@ back to more permissive execution.
 git clone https://github.com/fconidi/terminal-router.git
 cd terminal-router
 bash build-deb.sh
-sudo apt install ./terminal-router_1.3.9_all.deb
+sudo apt install ./terminal-router_1.3.10_all.deb
 terminal-router           # as your normal user, not root
 ```
 

@@ -24,7 +24,10 @@ command from MATE Terminal, GNOME Terminal or Terminator produces the same
 workspace. Router and observer
 remain visible in two independent terminal widgets backed by separate tmux
 sessions. Native selection, Shift-selection and context menus remain inside one
-widget and cannot cross the divider. Only the router session is recorded; the observer follows its dedicated log link across
+widget and cannot cross the divider. In the assistant widget, use the mouse
+wheel to browse up to 50,000 lines of history and Shift-drag for native text
+selection. The wheel is handled by tmux and does not enter arrow-key escape
+sequences in the assistant prompt. Only the router session is recorded; the observer follows its dedicated log link across
 pause/resume, unaffected by other sessions. It never sends commands to the
 router. Use F9/F10 to pause/resume recording even inside SSH.
 
