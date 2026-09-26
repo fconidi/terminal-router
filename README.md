@@ -1,5 +1,8 @@
 # terminal-router
 
+[![Release](https://img.shields.io/github/v/release/fconidi/terminal-router)](https://github.com/fconidi/terminal-router/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Opens two independent terminal widgets: **a router/switch shell on the left and
 a Claude Code or Codex observer on the right**. Connect to the device from the router
 terminal; the observer automatically reads its recorded output and
@@ -11,13 +14,53 @@ router: the assistant has no access to the device and never needs any. The
 operator types, the assistant reads the log and suggests, the operator
 decides what to run.
 
-## How it works
+## Contents
+
+- [Quick start](#quick-start)
+- [Connecting to a device](#connecting-to-a-device)
+- [Workspace and mouse behavior](#workspace-and-mouse-behavior)
+- [Assistant controls](#assistant-controls)
+- [Guarded configuration](#guarded-configuration)
+- [Recording-only modes](#recording-only-modes)
+- [Commands](#commands)
+- [Security and privacy](#security-and-privacy)
+- [Requirements](#requirements)
+- [Installation and upgrades](#installation-and-upgrades)
+- [Troubleshooting](#troubleshooting)
+- [Development](#development)
+
+## Quick start
 
 ```bash
 terminal-router          # Claude if available, otherwise Codex
 terminal-router claude   # explicitly choose Claude Code
 terminal-router codex    # explicitly choose Codex
 ```
+
+On the first run, terminal-router asks you to acknowledge that router output is
+recorded and sent to the selected AI provider. The desktop launcher opens a
+small terminal for this one-time consent, then future launches open the
+workspace directly.
+
+The left side is the only terminal connected to the device. The right side
+reads the left-side log, accepts questions and displays advice. If both AI CLIs
+are installed, automatic selection prefers Claude Code and then Codex. Use the
+explicit commands above whenever you want a specific provider.
+
+## Connecting to a device
+
+### SSH
+
+Run SSH from the left terminal:
+
+```bash
+ssh admin@192.168.1.1
+```
+
+Host-key and password prompts remain interactive in that terminal. Once the
+device starts producing output, the observer analyses it automatically.
+
+### Serial console
 
 The router pane includes serial-console hints for `tio`, `screen` and
 `picocom` (`tio` is the recommended default):
@@ -33,6 +76,14 @@ Depending on the adapter, use `/dev/ttyACM0` or the stable device path under
 `/dev/serial/by-id/`. If the console uses tio's defaults (115200 8N1, no flow
 control), `tio /dev/ttyUSB0` is sufficient. Press `Ctrl-t q` to exit tio.
 
+`tio` is installed as a mandatory dependency. `screen` and `picocom` are
+optional alternatives and must be installed separately. They work normally
+for manual sessions and their output is recorded, but guarded AI command
+delivery currently requires `tio` or `ssh` to be the active foreground
+program.
+
+## Workspace and mouse behavior
+
 The desktop entry opens this workspace directly in Terminator. The same command
 may be launched from MATE Terminal, GNOME Terminal or Terminator; the parent
 terminal does not affect the workspace. Router and
@@ -47,24 +98,41 @@ widget, use the mouse wheel to browse up to 50,000 lines of tmux history and
 Shift-drag for native text selection. Scrolling no longer enters arrow-key
 escape sequences in the assistant prompt.
 
+Mouse behavior differs intentionally between the two widgets:
+
+| Widget | Scroll | Select and copy | Context menu |
+|---|---|---|---|
+| Router, left | Terminal-native | Drag normally | Normal terminal menu |
+| Assistant, right | Mouse wheel browses tmux history | Hold Shift and drag | Opens on button release; touchpad two-finger tap is supported |
+
+The assistant retains up to 50,000 displayed lines. This scrollback is separate
+from the bounded snapshot sent to the AI provider.
+
+### Language
+
 The observer follows the system locale automatically. Supported languages are
 English, Italian, French, German and Spanish; unknown or `C` locales fall back
 to English. To choose a language explicitly, set `TR_LANGUAGE` to `en`, `it`,
 `fr`, `de` or `es`, for example `TR_LANGUAGE=it terminal-router`. Use
 `TR_LANGUAGE=auto` to return to automatic selection.
 
-- **F9 / F10:** pause/resume router recording, including while connected over SSH.
-- In the AI pane, type a question or press Enter to analyse the current output.
-- `:auto off` / `:auto on`: disable/enable automatic analysis. Turning it off
-  cancels the active request and clears queued questions; new questions typed
-  afterwards still work.
-- `:config on` / `:config off`: enable/disable guarded router configuration mode.
-- Ask the AI to apply or type the commands. It stages every proposed command,
-  shows the complete ordered group, and waits for `:confirm <code>` before
-  sending anything to the router pane. Up to 32 commands can be confirmed as
-  one group. Use `:cancel` to discard it; `:apply <command>` remains a manual
-  fallback for one command.
-- `:quit`: close the observer; the router pane remains available.
+## Assistant controls
+
+| Input | Effect |
+|---|---|
+| A question followed by Enter | Analyse the current router state and answer the question |
+| Empty Enter | Analyse the current router state immediately |
+| `:auto off` | Stop automatic analysis, cancel the active request and clear queued automatic work |
+| `:auto on` | Resume automatic analysis after it was disabled or stopped by an error |
+| `:config on` | Enable guarded configuration for the current observer |
+| `:config off` | Disable guarded configuration and discard pending commands |
+| `:apply <command>` | Manually stage one command for confirmation |
+| `:confirm <code>` | Send the displayed pending command group once |
+| `:cancel` | Discard the pending command group |
+| `:quit` | Close the observer while leaving the router terminal available |
+| `F9` / `F10` | Pause/resume router recording, including inside SSH or tio |
+
+### Analysis cadence and context
 
 Automatic analysis groups updates after two quiet seconds (at most five seconds
 of continuous output), with at least ten seconds between automatic requests.
@@ -79,6 +147,8 @@ CLI, with normal account usage. Replies are advice: the observer never types
 or executes commands in the router pane. Pausing capture prevents new automatic
 requests; a request already sent can still finish.
 
+## Guarded configuration
+
 Configuration mode is disabled by default and lasts only for the current
 observer. AI proposals are treated as untrusted input: every line is validated,
 the whole group is displayed, and nothing is sent until the operator enters the
@@ -86,6 +156,26 @@ one-time confirmation code. Commands are accepted only when `tio` or `ssh` is
 the foreground transport; shell operators, control characters and newlines are
 rejected. A group expires after 120 seconds; new AI analyses wait while it is
 pending, and F9 blocks it while the router pane is paused.
+
+Typical flow:
+
+```text
+:config on
+Configure interface Gi0/1 with description UPLINK and enable it
+
+Pending router commands:
+  1. configure terminal
+  2. interface Gi0/1
+  3. description UPLINK
+  4. no shutdown
+  5. end
+Type :confirm A1B2C3D4E5F6 within 120 seconds to send them, or :cancel.
+```
+
+Review every line before confirming. Confirmation authorizes exactly the shown
+group once; it does not give the assistant continuing control of the terminal.
+
+## Recording-only modes
 
 The existing global recording mode remains available with `terminal-router install`:
 
@@ -137,7 +227,7 @@ Missing rotation or an idle tmux server are advisory warnings. A live pipe
 does not prove that output is reaching disk; inspect the log when diagnosing
 capture problems.
 
-## Security
+## Security and privacy
 
 The log captures everything visible on screen. Passwords typed at an
 interactive prompt (`sudo`, SSH password auth) are **not** captured — the
@@ -175,7 +265,25 @@ configuration. Codex also runs read-only. Authentication is retained; optional
 is used. Older CLIs lacking these flags report an error rather than falling
 back to more permissive execution.
 
-## Install
+## Installation and upgrades
+
+### Install the GitHub release
+
+Download the packaged release and let APT install its dependencies:
+
+```bash
+wget https://github.com/fconidi/terminal-router/releases/download/v1.1.0/terminal-router_1.1.0_all.deb
+sudo apt install ./terminal-router_1.1.0_all.deb
+terminal-router
+```
+
+The release page also publishes the SHA-256 checksum. Download it beside the
+package and verify the file before installing:
+
+```bash
+wget https://github.com/fconidi/terminal-router/releases/download/v1.1.0/terminal-router_1.1.0_all.deb.sha256
+sha256sum -c terminal-router_1.1.0_all.deb.sha256
+```
 
 ### Debian / Ubuntu — build the .deb
 
@@ -186,6 +294,8 @@ bash build-deb.sh
 sudo apt install ./terminal-router_1.1.0_all.deb
 terminal-router           # as your normal user, not root
 ```
+
+### Upgrade notes
 
 After upgrading from 1.0.x, re-run `terminal-router install` if you use the
 global setup. It updates only marked blocks, saves `*.terminal-router.bak`,
@@ -204,6 +314,74 @@ wget -qO- https://fconidi.github.io/SysLinuxOS-Tools/syslinuxos-archive-keyring.
 sudo apt update && sudo apt install terminal-router
 ```
 
+## Troubleshooting
+
+### The workspace says Claude or Codex is missing
+
+Install and authenticate at least one supported CLI, then verify it as your
+normal user:
+
+```bash
+command -v claude || command -v codex
+claude --version    # or: codex --version
+```
+
+terminal-router also checks `~/.local/bin` and nvm installations when launched
+from the desktop menu.
+
+### The serial device cannot be opened
+
+List devices and permissions:
+
+```bash
+tio --list
+ls -l /dev/ttyUSB0 /dev/ttyACM0 2>/dev/null
+groups
+```
+
+On Debian-family systems, serial ports commonly belong to the `dialout` group.
+If required, add your user and then log out and back in:
+
+```bash
+sudo usermod -aG dialout "$USER"
+```
+
+### The observer does not receive new output
+
+Run the read-only diagnostic and inspect the current log:
+
+```bash
+terminal-router doctor
+terminal-router tail
+```
+
+Check that recording was not paused with F9 and that the device command runs in
+the left widget. The right widget is deliberately excluded from capture.
+
+### Automatic analysis stopped
+
+The provider CLI may have expired authentication, returned an error or exceeded
+the 120-second timeout. Check the visible error, sign in to the selected CLI if
+needed, then enter `:auto on`.
+
+### Terminator prints warnings in the launching terminal
+
+Messages about `hide_window`, `match_remove` or a window missing from the
+registered list originate from Terminator when another instance owns a global
+shortcut or when the independent layout closes. If both widgets open and work,
+these warnings do not indicate lost router output. Use `terminal-router doctor`
+to diagnose the capture path itself.
+
+### Remove terminal-router configuration
+
+```bash
+terminal-router remove
+```
+
+This removes only managed shell/tmux blocks, preserving backups and unrelated
+configuration. APT package removal is separate: `sudo apt remove
+terminal-router`.
+
 ## Syncing from syslinuxos-packages
 
 Day-to-day fixes happen in the `syslinuxos-packages` monorepo (which also
@@ -217,7 +395,7 @@ scripts/sync-from-monorepo.sh [path-to-syslinuxos-packages]
 The 1.1.0 changes were developed in this standalone repository; reconcile them
 with the monorepo before the next sync to avoid restoring older code.
 
-## Development checks
+## Development
 
 Run as a normal user with Python 3 and tmux installed:
 
