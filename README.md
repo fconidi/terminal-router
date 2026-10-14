@@ -383,25 +383,6 @@ configuration. APT package removal is separate: `sudo apt remove
 terminal-router`.
 
 
-## Development
-
-Run as a normal user with Python 3 and tmux installed:
-
-```bash
-python3 -m unittest discover -s tests -v
-bash build-deb.sh
-```
-
-Tests isolate HOME and tmux sockets under `/tmp`, use a fake crontab, and
-simulate both AI CLIs. They exercise actual tmux capture, automatic analysis,
-operator questions and F9/F10 through a pseudoterminal. No router or AI account
-is contacted; live authentication/model quality still needs an operator test.
-
-Hook arguments use tmux's shell-quoting modifier, as documented in the
-[tmux formats reference](https://github.com/tmux/tmux/wiki/Formats).
-The hook configuration syntax requires [tmux 3.0 or newer](https://github.com/tmux/tmux/blob/3.0/CHANGES).
-Further ideas and their acceptance criteria are in [ROADMAP.md](ROADMAP.md).
-
 ## License
 
 MIT — see [LICENSE](LICENSE).

@@ -18,8 +18,6 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   `tio`, `screen` and `picocom`.
 - Pane-level `pause` and `resume` commands plus read-only `doctor`
   diagnostics.
-- Isolated integration tests covering tmux capture, both AI engines,
-  configuration confirmation, packaging and workspace controls.
 
 ### Changed
 - No-argument and desktop startup open the integrated workspace; `menu` keeps

@@ -8,8 +8,7 @@ terminal-router (1.1.0) tirreno; urgency=medium
     serial-console hints for tio, screen and picocom.
   * Keep router selection native and isolated; add 50,000 lines of scrollable
     assistant history with Shift-drag native selection.
-  * Harden logging, setup, cleanup and cron handling; add isolated regression
-    tests for tmux, both AI engines, packaging and workspace controls.
+  * Harden logging, setup, cleanup and cron handling.
 
  -- Franco Conidi <fconidi@gmail.com>  Sat, 26 Sep 2026 00:00:00 +0200
 
