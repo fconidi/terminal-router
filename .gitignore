@@ -27,3 +27,6 @@ VALIDATION*.[Mm][Dd]
 [Ss][Ee][Ss][Ss][Ii][Oo][Nn]*.md
 [Aa][Nn][Aa][Ll][Ii][Ss][Ii]*.md
 [Cc][Oo][Dd][Ee][Xx]*.md
+
+# Local-only maintenance and agent configuration
+scripts/sync-from-monorepo.sh
