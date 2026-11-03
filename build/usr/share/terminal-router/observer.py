@@ -2,6 +2,7 @@
 """Read one router log, ask an AI CLI, display advice. Never drive the router."""
 from collections import deque
 import hmac
+import json
 import os
 from pathlib import Path
 import re
@@ -16,6 +17,10 @@ import time
 
 SUPPORTED_LANGUAGES = frozenset(("en", "it", "fr", "de", "es"))
 MAX_SNAPSHOT_BYTES = 128 * 1024
+AGY_SETTINGS = json.dumps({"toolPermission": "strict", "permissions": {"deny": [
+    "read_file(*)", "write_file(*)", "read_url(*)", "execute_url(*)",
+    "command(*)", "unsandboxed(*)", "mcp(*)",
+]}})
 
 INSTRUCTIONS_BY_LANGUAGE = {
     "en": """You are a network engineer observing a router/switch terminal.
@@ -463,12 +468,17 @@ class EngineJob:
                     "--disable", "multi_agent", "-c", 'web_search="disabled"',
                     "-c", "project_doc_max_bytes=0"]
             prompt = instructions + "\n" + prompt
+        elif engine == "agy":
+            args = [binary, "--settings", AGY_SETTINGS, "--disable-slash-commands"]
+            prompt = instructions + "\n" + prompt
         else:
             raise ValueError("unknown engine")
         if model:
             args += ["--model", model]
         if engine == "codex":
             args.append("-")
+        elif engine == "agy":
+            args.append("-p=" + prompt)
         # Drop the caller shell's proxy/profile overrides (e.g. a headroom-style
         # local proxy set for interactive sessions) so this headless one-shot
         # call always reaches the real provider with the default credentials.
@@ -767,8 +777,8 @@ if __name__ == "__main__":
     os.umask(0o077)
     for signum in (signal.SIGTERM, signal.SIGHUP, signal.SIGINT):
         signal.signal(signum, interrupted)
-    if len(sys.argv) != 5 or sys.argv[1] not in ("claude", "codex"):
-        sys.exit("Usage: observer.py <claude|codex> <binary> <workspace-directory> <pane-id>")
+    if len(sys.argv) != 5 or sys.argv[1] not in ("claude", "codex", "agy"):
+        sys.exit("Usage: observer.py <claude|codex|agy> <binary> <workspace-directory> <pane-id>")
     try:
         run(sys.argv[1], sys.argv[2], Path(sys.argv[3]), sys.argv[4])
     except (OSError, subprocess.SubprocessError) as error:

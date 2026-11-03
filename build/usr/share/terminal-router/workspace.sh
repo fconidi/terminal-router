@@ -38,10 +38,11 @@ cmd_workspace() {
         "")
             if binary=$(resolve_assistant claude); then engine=claude
             elif binary=$(resolve_assistant codex); then engine=codex
-            else die "install and sign in to Claude Code or Codex first; 'terminal-router launch' records without AI."
+            elif binary=$(resolve_assistant agy); then engine=agy
+            else die "install and sign in to Claude Code, Codex or agy first; 'terminal-router launch' records without AI."
             fi ;;
-        claude|codex) binary=$(resolve_assistant "$engine") || die "$engine not found; install and sign in first." ;;
-        *) die "usage: terminal-router workspace [claude|codex]" ;;
+        claude|codex|agy) binary=$(resolve_assistant "$engine") || die "$engine not found; install and sign in first." ;;
+        *) die "usage: terminal-router workspace [claude|codex|agy]" ;;
     esac
     command -v python3 >/dev/null || die "python3 is required for the AI observer."
     command -v terminator >/dev/null || die "terminator is required for independent router and assistant terminals."

@@ -12,7 +12,7 @@ case "$1" in
         echo "  Logging is opt-in; existing user setups are preserved."
         echo "  To enable logging:"
         echo "    terminal-router              router left, AI observer right"
-        echo "    terminal-router claude|codex  choose the AI engine explicitly"
+        echo "    terminal-router claude|codex|agy  choose the AI engine explicitly"
         echo "    terminal-router install      record every terminal"
         echo "    terminal-router launch        one session only, no dotfile edits"
         echo ""

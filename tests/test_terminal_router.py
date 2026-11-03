@@ -251,7 +251,7 @@ with Path("requests.jsonl").open("a") as output:
     output.write(json.dumps({"args":sys.argv[1:], "prompt":sys.stdin.read()})+"\\n")
 print("CODEX_STUB_REPLY")' "$@"
 ''')
-        self.run_cmd(str(self.cli))
+        self.run_cmd(str(self.cli), "codex")
         state, = (self.home / ".claude-logs").glob("workspace-*")
         socket = str(state / "tmux.sock")
         pane_by_role = self.workspace_panes(socket)
@@ -271,6 +271,28 @@ print("CODEX_STUB_REPLY")' "$@"
         second = json.loads(requests.read_text().splitlines()[1])
         self.assertIn("Perche la porta e down?", second["prompt"])
         self.assertNotIn("CODEX_STUB_REPLY", (state / "current").read_text())
+
+    def test_agy_workspace_sends_router_snapshot_with_tool_denial(self):
+        self.consent()
+        self.script("agy", '''exec python3 -c 'import json,sys
+from pathlib import Path
+Path("agy-request.json").write_text(json.dumps(sys.argv[1:]))
+print("AGY_STUB_REPLY")' "$@"
+''')
+        self.run_cmd(str(self.cli), "agy")
+        state, = (self.home / ".claude-logs").glob("workspace-*")
+        socket = str(state / "tmux.sock")
+        router = self.workspace_panes(socket)["router"]
+        self.run_cmd("tmux", "-S", socket, "send-keys", "-t", router,
+                     "-l", "echo AGY_ROUTER_OUTPUT")
+        self.run_cmd("tmux", "-S", socket, "send-keys", "-t", router, "Enter")
+        request = state / "agy-request.json"
+        self.wait_for(request.exists)
+        args = json.loads(request.read_text())
+        self.assertIn("AGY_ROUTER_OUTPUT", args[-1])
+        self.assertIn("--disable-slash-commands", args)
+        settings = json.loads(args[args.index("--settings") + 1])
+        self.assertIn("command(*)", settings["permissions"]["deny"])
 
     def test_auto_off_cancels_running_analysis_and_clears_queued_questions(self):
         self.consent()
@@ -378,10 +400,11 @@ while True:
                         router_output.index("TIO_RX:echo AI_CONFIG_TWO"))
 
     def test_missing_requested_engine_fails_before_creating_workspace(self):
-        self.script("claude", 'exit 99\n')
-        result = self.run_cmd(str(self.cli), "codex", check=False)
+        if shutil.which("agy"):
+            self.skipTest("agy is installed on this host")
+        result = self.run_cmd(str(self.cli), "agy", check=False)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("codex not found", result.stderr)
+        self.assertIn("agy not found", result.stderr)
         self.assertFalse((self.home / ".claude-logs").exists())
 
     def test_workspace_function_keys_pause_and_resume_without_router_commands(self):

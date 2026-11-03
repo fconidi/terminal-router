@@ -11,12 +11,13 @@ reads and suggests, you decide what to run. Recording-only modes keep the log lo
 to the selected provider using your CLI account.
 
 
-Integrated workspace (default since 1.1.0)
+Integrated workspace (default since 1.2.0)
 -----------------------------------------
 
   terminal-router          router/switch pane left, AI observer pane right
   terminal-router claude   explicitly select Claude Code
   terminal-router codex    explicitly select Codex
+  terminal-router agy      explicitly select Antigravity CLI
   terminal-router menu     configuration and alternate launch modes
 
 The desktop icon opens the workspace directly in Terminator. Launching the same
@@ -79,9 +80,10 @@ Detaching tmux does not stop recording or the observer. Reattach using:
   tmux -S ~/.claude-logs/workspace-ID/tmux.sock attach
 
 Requires tio, Terminator, Python 3 (standard library), tmux >= 3.0, and a current authenticated
-Claude Code or Codex CLI. Optional models: TR_CLAUDE_MODEL / TR_CODEX_MODEL.
+Claude Code, Codex or agy CLI. Optional models: TR_CLAUDE_MODEL / TR_CODEX_MODEL / TR_AGY_MODEL.
 The observer disables shell tools and configured integrations and ignores
-project configuration; Codex also uses read-only mode. Authentication is kept.
+project configuration; Codex also uses read-only mode and agy denies
+file, command, URL and MCP tools. Authentication is kept.
 See man terminal-router for the full controls, environment and caveats.
 
 Global recording with terminal-router install

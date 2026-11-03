@@ -1,17 +1,17 @@
-.TH TERMINAL-ROUTER 1 "September 2026" "terminal-router 1.1.0" "SysLinuxOS Manual"
+.TH TERMINAL-ROUTER 1 "November 2026" "terminal-router 1.2.0" "SysLinuxOS Manual"
 .SH NAME
 terminal\-router \- record tmux terminal sessions for AI\-assisted router work
 .SH SYNOPSIS
 .B terminal\-router
-.RI [ claude | codex | command ]
+.RI [ claude | codex | agy | command ]
 .br
 .B terminal\-router workspace
-.RI [ claude | codex ]
+.RI [ claude | codex | agy ]
 .SH DESCRIPTION
 .B terminal\-router
 opens a two\-terminal Terminator workspace by default. The router terminal on the left is a
 normal shell for connecting to a router or switch. The observer pane on the right runs Claude
-Code or Codex and automatically analyses new recorded output and answers
+Code, Codex or agy and automatically analyses new recorded output and answers
 questions typed by the operator. No separate assistant terminal or manual log
 selection is required.
 .PP
@@ -69,18 +69,18 @@ is found on PATH, since the log they set up then has no AI assistant to
 read it.
 .SH COMMANDS
 .TP
-.BR workspace " [claude|codex]"
+.BR workspace " [claude|codex|agy]"
 Open the integrated workspace. With no arguments, terminal\-router does the
-same. Automatic engine selection prefers Claude Code, then Codex. Both terminals
+same. Automatic engine selection prefers Claude Code, then Codex, then agy. Both terminals
 remain visible; click one to focus it. Normal selection, Shift-selection,
 copying and context menus remain inside that terminal widget and cannot cross
 the divider. It may be launched from MATE Terminal, GNOME Terminal or
 Terminator; the parent terminal does not change the resulting workspace.
 Initial focus is on the router terminal.
 .TP
-.BR claude ", " codex
+.BR claude ", " codex ", " agy
 Open the workspace using exactly the named engine. A missing engine produces
-an error; it is not silently replaced by the other engine. The CLI must already
+an error; it is not silently replaced by another engine. The CLI must already
 be installed and authenticated.
 .TP
 .B install
@@ -241,6 +241,9 @@ Optional Claude model override for the observer.
 .TP
 .B TR_CODEX_MODEL
 Optional Codex model override for the observer.
+.TP
+.B TR_AGY_MODEL
+Optional agy model override for the observer.
 .TP
 .B TR_LANGUAGE
 Observer language override: one of

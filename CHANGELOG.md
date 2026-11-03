@@ -3,6 +3,12 @@
 All notable changes to this project are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.2.0] - 2026-11-03
+
+### Added
+- Antigravity CLI (agy) observer with strict tool denial, explicit selection,
+  automatic selection after Claude and Codex, and optional model override.
+
 ## [1.1.0] - 2026-09-26
 
 ### Added

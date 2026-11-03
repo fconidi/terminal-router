@@ -2,6 +2,7 @@ import importlib.util
 import os
 from pathlib import Path
 import tempfile
+import json
 import sys
 import unittest
 from unittest.mock import patch
@@ -151,6 +152,34 @@ class ObserverTests(unittest.TestCase):
                 self.assertIn("$(touch NOT_EXECUTED)", reply)
                 self.assertEqual((state / "received").read_text(), "router snapshot")
                 self.assertFalse((state / "NOT_EXECUTED").exists())
+            finally:
+                job.close()
+
+    def test_agy_receives_snapshot_with_all_tools_denied(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory)
+            binary = state / "agy"
+            binary.write_text("#!/usr/bin/env python3\nimport json,sys\n"
+                              "open('request.json','w').write(json.dumps(sys.argv[1:]))\n"
+                              "print('The interface is down.')\n")
+            binary.chmod(0o755)
+            with patch.dict(os.environ, {"TR_AGY_MODEL": "example-model"}):
+                job = observer.EngineJob("agy", str(binary), state, "INTERFACE_DOWN")
+            try:
+                job.process.wait(timeout=5)
+                success, reply = job.result()
+                self.assertTrue(success)
+                self.assertIn("interface is down", reply)
+                args = json.loads((state / "request.json").read_text())
+                settings = json.loads(args[args.index("--settings") + 1])
+                self.assertEqual(settings["toolPermission"], "strict")
+                self.assertEqual(set(settings["permissions"]["deny"]), {
+                    "read_file(*)", "write_file(*)", "read_url(*)", "execute_url(*)",
+                    "command(*)", "unsandboxed(*)", "mcp(*)"})
+                self.assertIn("--disable-slash-commands", args)
+                self.assertEqual(args[args.index("--model") + 1], "example-model")
+                self.assertIn("INTERFACE_DOWN", args[-1])
+                self.assertTrue(args[-1].startswith("-p="))
             finally:
                 job.close()
 

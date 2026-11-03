@@ -48,7 +48,11 @@ fi
 # Build
 echo "==> dpkg-deb --build"
 rm -f "$OUTPUT_DEB"
-fakeroot dpkg-deb --build "$BUILD" "$OUTPUT_DEB"
+if command -v fakeroot >/dev/null 2>&1; then
+    fakeroot dpkg-deb --build "$BUILD" "$OUTPUT_DEB"
+else
+    dpkg-deb --root-owner-group --build "$BUILD" "$OUTPUT_DEB"
+fi
 
 # Verify
 echo

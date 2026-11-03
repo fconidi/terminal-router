@@ -1,5 +1,5 @@
 Package: terminal-router
-Version: 1.1.0
+Version: 1.2.0
 Section: net
 Priority: optional
 Architecture: all
@@ -18,7 +18,7 @@ Description: Terminal Router - tmux session recorder for AI-assisted router work
  decides what to run.
  .
  Features:
-  - Independent Terminator widgets for router and live Claude/Codex observer
+  - Independent Terminator widgets for router and live Claude/Codex/agy observer
   - Scrollable 50,000-line history in the assistant terminal
   - tio dependency and serial-console hints for tio, screen and picocom
   - AI follows only the router session, accepts questions and never sends commands
@@ -41,4 +41,4 @@ Description: Terminal Router - tmux session recorder for AI-assisted router work
  install time: the user must explicitly opt in from the menu entry or with
  "terminal-router install", after acknowledging that the log captures whatever
  is printed on screen.
-Installed-Size: 208
+Installed-Size: 296

@@ -9,7 +9,7 @@
 
 set -uo pipefail
 
-VERSION="1.1.0"
+VERSION="1.2.0"
 INSTALLER="/usr/share/terminal-router/install.sh"
 CONSENT="$HOME/.config/terminal-router/consent"
 source /usr/share/terminal-router/common.sh || exit 1
@@ -36,6 +36,7 @@ assistant_status() {
     local found="" p
     command -v claude > /dev/null 2>&1 && found="$found claude"
     command -v codex > /dev/null 2>&1 && found="$found codex"
+    command -v agy > /dev/null 2>&1 && found="$found agy"
 
     if [[ "$found" != *claude* ]]; then
         for p in "$HOME/.local/bin/claude" "$HOME"/.nvm/versions/node/*/bin/claude; do
@@ -47,6 +48,11 @@ assistant_status() {
             [ -x "$p" ] && { found="$found codex"; break; }
         done
     fi
+    if [[ "$found" != *agy* ]]; then
+        for p in "$HOME/.local/bin/agy" "$HOME"/.nvm/versions/node/*/bin/agy; do
+            [ -x "$p" ] && { found="$found agy"; break; }
+        done
+    fi
 
     echo "${found# }"
 }
@@ -54,7 +60,7 @@ assistant_status() {
 warn_no_assistant() {
     if [ -z "$(assistant_status)" ]; then
         echo >&2
-        echo "WARN  no AI assistant CLI found on PATH (claude, codex) — this log has" >&2
+        echo "WARN  no AI assistant CLI found on PATH (claude, codex, agy) — this log has" >&2
         echo "      nothing to read it yet. Install one, or ignore if you read logs" >&2
         echo "      some other way." >&2
     fi
@@ -266,7 +272,7 @@ cmd_status() {
     if [ -n "$assistants" ]; then
         echo "  AI assistant    found      ($assistants)"
     else
-        echo "  AI assistant    NOT FOUND  (claude, codex) — nothing to read this log"
+        echo "  AI assistant    NOT FOUND  (claude, codex, agy) — nothing to read this log"
     fi
 
     if command -v tmux > /dev/null 2>&1 && tmux show-hooks -g 2>/dev/null | grep -q pipe-pane; then
@@ -448,12 +454,13 @@ Records every interactive terminal to ~/.claude-logs so Claude Code can follow
 a live router CLI session (Cisco/Huawei over SSH) in real time. Claude reads the
 log and suggests; you stay the only one touching the device.
 
-Usage: terminal-router [claude|codex|command]
+Usage: terminal-router [claude|codex|agy|command]
 
   (no args) Open two side-by-side panes: router and AI observer
   claude    Open the workspace with Claude Code
   codex     Open the workspace with Codex
-  workspace [claude|codex]   Same integrated workspace
+  agy       Open the workspace with Antigravity CLI
+  workspace [claude|codex|agy]   Same integrated workspace
   install   Set up the shell and tmux hooks for the current user (every terminal)
   launch    Log only this terminal, one-shot — no ~/.bashrc/~/.zshrc/~/.tmux.conf edits
   remove    Remove them again (with backups) and optionally delete the logs
@@ -478,7 +485,7 @@ EOF
 case "${1:-workspace}" in
     workspace)      source "${INSTALLER%/*}/workspace.sh"; cmd_workspace "${2:-}" ;;
     workspace-gui)  cmd_workspace_gui "${2:-}" ;;
-    claude|codex)   source "${INSTALLER%/*}/workspace.sh"; cmd_workspace "$1" ;;
+    claude|codex|agy) source "${INSTALLER%/*}/workspace.sh"; cmd_workspace "$1" ;;
     install)        cmd_install ;;
     launch|single)  cmd_launch ;;
     remove|uninstall) cmd_remove ;;

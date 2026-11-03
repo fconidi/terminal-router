@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Opens two independent terminal widgets: **a router/switch shell on the left and
-a Claude Code or Codex observer on the right**. Connect to the device from the router
+a Claude Code, Codex or Antigravity CLI (agy) observer on the right**. Connect to the device from the router
 terminal; the observer automatically reads its recorded output and
 explains what changes. Ask questions there without opening another terminal or
 telling the assistant which tmux log to read.
@@ -32,9 +32,10 @@ decides what to run.
 ## Quick start
 
 ```bash
-terminal-router          # Claude if available, otherwise Codex
+terminal-router          # Claude if available, then Codex, then agy
 terminal-router claude   # explicitly choose Claude Code
 terminal-router codex    # explicitly choose Codex
+terminal-router agy      # explicitly choose Antigravity CLI
 ```
 
 On the first run, terminal-router asks you to acknowledge that router output is
@@ -43,8 +44,8 @@ small terminal for this one-time consent, then future launches open the
 workspace directly.
 
 The left side is the only terminal connected to the device. The right side
-reads the left-side log, accepts questions and displays advice. If both AI CLIs
-are installed, automatic selection prefers Claude Code and then Codex. Use the
+reads the left-side log, accepts questions and displays advice. If multiple AI CLIs
+are installed, automatic selection prefers Claude Code, then Codex, then agy. Use the
 explicit commands above whenever you want a specific provider.
 
 ## Connecting to a device
@@ -256,12 +257,13 @@ manually clean up with `rm ~/.claude-logs/tmux-*.log` when needed.
 `bash`, `tmux >= 3.0`, `python3` (standard library only), `tio`, and `terminator`.
 `cron` is recommended
 for log rotation. Workspaces require a current, authenticated Claude Code or
-Codex CLI, found on PATH, in `~/.local/bin`, or under nvm. Recording-only commands
+Codex or agy CLI, found on PATH, in `~/.local/bin`, or under nvm. Recording-only commands
 still work without AI.
 
-The observer disables shell tools and configured integrations and ignores project
-configuration. Codex also runs read-only. Authentication is retained; optional
-`TR_CLAUDE_MODEL` / `TR_CODEX_MODEL` select a model, otherwise the CLI default
+The observer disables tools and configured integrations and ignores project
+configuration. Codex also runs read-only; agy uses strict permissions with
+file, command, URL and MCP tools denied. Authentication is retained; optional
+`TR_CLAUDE_MODEL` / `TR_CODEX_MODEL` / `TR_AGY_MODEL` select a model, otherwise the CLI default
 is used. Older CLIs lacking these flags report an error rather than falling
 back to more permissive execution.
 
@@ -272,8 +274,8 @@ back to more permissive execution.
 Download the packaged release and let APT install its dependencies:
 
 ```bash
-wget https://github.com/fconidi/terminal-router/releases/download/v1.1.0/terminal-router_1.1.0_all.deb
-sudo apt install ./terminal-router_1.1.0_all.deb
+wget https://github.com/fconidi/terminal-router/releases/download/v1.2.0/terminal-router_1.2.0_all.deb
+sudo apt install ./terminal-router_1.2.0_all.deb
 terminal-router
 ```
 
@@ -281,8 +283,8 @@ The release page also publishes the SHA-256 checksum. Download it beside the
 package and verify the file before installing:
 
 ```bash
-wget https://github.com/fconidi/terminal-router/releases/download/v1.1.0/terminal-router_1.1.0_all.deb.sha256
-sha256sum -c terminal-router_1.1.0_all.deb.sha256
+wget https://github.com/fconidi/terminal-router/releases/download/v1.2.0/terminal-router_1.2.0_all.deb.sha256
+sha256sum -c terminal-router_1.2.0_all.deb.sha256
 ```
 
 ### Debian / Ubuntu — build the .deb
@@ -291,7 +293,7 @@ sha256sum -c terminal-router_1.1.0_all.deb.sha256
 git clone https://github.com/fconidi/terminal-router.git
 cd terminal-router
 bash build-deb.sh
-sudo apt install ./terminal-router_1.1.0_all.deb
+sudo apt install ./terminal-router_1.2.0_all.deb
 terminal-router           # as your normal user, not root
 ```
 
@@ -316,14 +318,14 @@ sudo apt update && sudo apt install terminal-router
 
 ## Troubleshooting
 
-### The workspace says Claude or Codex is missing
+### The workspace says an AI CLI is missing
 
 Install and authenticate at least one supported CLI, then verify it as your
 normal user:
 
 ```bash
-command -v claude || command -v codex
-claude --version    # or: codex --version
+command -v claude || command -v codex || command -v agy
+claude --version    # or: codex --version / agy --version
 ```
 
 terminal-router also checks `~/.local/bin` and nvm installations when launched

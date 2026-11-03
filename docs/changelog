@@ -1,3 +1,10 @@
+terminal-router (1.2.0) tirreno; urgency=medium
+
+  * Add Antigravity CLI (agy) as a router observer with strict tool denial.
+  * Add explicit and automatic selection and an optional agy model override.
+
+ -- Franco Conidi <fconidi@gmail.com>  Tue, 03 Nov 2026 12:00:00 +0100
+
 terminal-router (1.1.0) tirreno; urgency=medium
 
   * Add an integrated router and Claude/Codex workspace in two independent
