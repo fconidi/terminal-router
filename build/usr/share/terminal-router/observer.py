@@ -93,7 +93,7 @@ MESSAGES = {
         "confirm_prompt": "Type :confirm {code} within 120 seconds to send them, or :cancel.",
         "no_pending": "There is no pending router command.",
         "pending_expired": "The pending command expired; nothing was sent.",
-        "pending_invalidated": "The pending command was canceled because the router transport changed.",
+        "pending_invalidated": "The pending command was canceled because the router connection changed.",
         "confirmation_invalid": "Confirmation code does not match; nothing was sent.",
         "router_unavailable": "The router pane is unavailable or recording is paused; nothing was sent.",
         "transport_required": "Start tio or ssh in the router pane before applying a command.",
@@ -135,7 +135,7 @@ MESSAGES = {
         "confirm_prompt": "Scrivi :confirm {code} entro 120 secondi per inviarli, oppure :cancel.",
         "no_pending": "Non ci sono comandi router in attesa.",
         "pending_expired": "Il comando in attesa e scaduto; non e stato inviato.",
-        "pending_invalidated": "Il comando in attesa e stato annullato perche il trasporto del router e cambiato.",
+        "pending_invalidated": "Il comando in attesa e stato annullato perche la connessione al router e cambiata.",
         "confirmation_invalid": "Il codice di conferma non corrisponde; non e stato inviato nulla.",
         "router_unavailable": "Il pannello router non e disponibile o la registrazione e in pausa; non e stato inviato nulla.",
         "transport_required": "Avvia tio o ssh nel pannello router prima di applicare un comando.",
@@ -177,7 +177,7 @@ MESSAGES = {
         "confirm_prompt": "Tapez :confirm {code} dans les 120 secondes pour les envoyer, ou :cancel.",
         "no_pending": "Aucune commande routeur en attente.",
         "pending_expired": "La commande en attente a expiré ; rien n'a été envoyé.",
-        "pending_invalidated": "La commande en attente a été annulée car le transport du routeur a changé.",
+        "pending_invalidated": "La commande en attente a été annulée car la connexion au routeur a changé.",
         "confirmation_invalid": "Le code de confirmation ne correspond pas ; rien n'a été envoyé.",
         "router_unavailable": "Le panneau routeur est indisponible ou l'enregistrement est en pause ; rien n'a été envoyé.",
         "transport_required": "Démarrez tio ou ssh dans le panneau routeur avant d'appliquer une commande.",
@@ -219,7 +219,7 @@ MESSAGES = {
         "confirm_prompt": ":confirm {code} innerhalb von 120 Sekunden eingeben, um sie zu senden, oder :cancel.",
         "no_pending": "Es gibt keinen ausstehenden Router-Befehl.",
         "pending_expired": "Der ausstehende Befehl ist abgelaufen; nichts wurde gesendet.",
-        "pending_invalidated": "Der ausstehende Befehl wurde abgebrochen, weil sich der Router-Transport geändert hat.",
+        "pending_invalidated": "Der ausstehende Befehl wurde abgebrochen, weil sich die Router-Verbindung geändert hat.",
         "confirmation_invalid": "Der Bestätigungscode stimmt nicht überein; nichts wurde gesendet.",
         "router_unavailable": "Der Router-Bereich ist nicht verfügbar oder die Aufzeichnung pausiert; nichts wurde gesendet.",
         "transport_required": "Starten Sie tio oder ssh im Router-Bereich, bevor Sie einen Befehl anwenden.",
@@ -261,7 +261,7 @@ MESSAGES = {
         "confirm_prompt": "Escribe :confirm {code} en 120 segundos para enviarlos, o :cancel.",
         "no_pending": "No hay ningún comando del router pendiente.",
         "pending_expired": "El comando pendiente ha caducado; no se envió nada.",
-        "pending_invalidated": "El comando pendiente se canceló porque cambió el transporte del router.",
+        "pending_invalidated": "El comando pendiente se canceló porque cambió la conexión con el router.",
         "confirmation_invalid": "El código de confirmación no coincide; no se envió nada.",
         "router_unavailable": "El panel del router no está disponible o la grabación está pausada; no se envió nada.",
         "transport_required": "Inicia tio o ssh en el panel del router antes de aplicar un comando.",
@@ -523,25 +523,75 @@ class EngineJob:
         self.stderr.close()
 
 
+def tmux_socket(state):
+    """The workspace's tmux socket: next to the logs, or the short path recorded in
+    "socket" when the state directory path is too long for a Unix socket."""
+    record = state / "socket"
+    try:
+        if record.is_file() and not record.is_symlink():
+            path = record.read_text().split("\n", 1)[0].strip()
+            if path.startswith("/"):
+                return Path(path)
+    except OSError:
+        pass
+    return state / "tmux.sock"
+
+
+def connection_identity(tty, transport):
+    """Identify the live connection process (not just its program name).
+
+    Two successive `tio` or `ssh` sessions in the same pane share a name; a
+    command staged for one must never be sent to the next. The identity is the
+    foreground process of the pane's terminal: its pid plus its start time, so
+    a recycled pid is a different connection. Returns None when it cannot be
+    determined, and callers then refuse to send.
+    """
+    name = tty.strip()
+    if name.startswith("/dev/"):
+        name = name[len("/dev/"):]
+    if not name or transport not in ALLOWED_TRANSPORT_COMMANDS:
+        return None
+    try:
+        result = subprocess.run(
+            ["ps", "-ww", "-t", name, "-o", "pid=,stat=,lstart=,args="],
+            capture_output=True, text=True, timeout=3,
+            env=dict(os.environ, LC_ALL="C"))
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if result.returncode:
+        return None
+    for line in result.stdout.splitlines():
+        # pid, state, five lstart words, then the command line.
+        parts = line.split(None, 7)
+        if len(parts) < 8 or "+" not in parts[1]:
+            continue
+        # A "+" in the process state marks the foreground process group.
+        if Path(parts[7].split()[0]).name == transport:
+            return f"{parts[0]}:{' '.join(parts[2:7])}"
+    return None
+
+
 def router_pane_state(state, pane):
     try:
         result = subprocess.run(
-            ["tmux", "-S", str(state / "tmux.sock"), "display-message", "-p", "-t", pane,
+            ["tmux", "-S", str(tmux_socket(state)), "display-message", "-p", "-t", pane,
              "#{pane_id}|#{@terminal_router_role}|#{@terminal_router_config_blocked}|"
-             "#{pane_pipe}|#{pane_current_command}"],
+             "#{pane_pipe}|#{pane_current_command}|#{pane_tty}"],
             capture_output=True, text=True, timeout=3,
         )
     except (OSError, subprocess.SubprocessError):
         return None
     if result.returncode:
         return None
-    fields = result.stdout.strip().split("|", 4)
-    if len(fields) != 5 or fields[0] != pane or fields[1] != "router":
+    fields = result.stdout.strip().split("|", 5)
+    if len(fields) != 6 or fields[0] != pane or fields[1] != "router":
         return None
+    transport = fields[4].strip()
     return {
         "blocked": fields[2] == "1",
         "recording": fields[3] == "1",
-        "transport": fields[4].strip(),
+        "transport": transport,
+        "connection": connection_identity(fields[5], transport),
     }
 
 
@@ -557,13 +607,14 @@ def prepare_router_commands(state, pane, commands):
     target = router_pane_state(state, pane)
     if target is None or target["blocked"] or not target["recording"]:
         return None, ("router_unavailable", {})
-    if target["transport"] not in ALLOWED_TRANSPORT_COMMANDS:
+    if target["transport"] not in ALLOWED_TRANSPORT_COMMANDS or target["connection"] is None:
         return None, ("transport_required", {})
     return {
         "commands": commands,
         "code": confirmation_code(),
         "expires_at": time.monotonic() + COMMAND_CONFIRMATION_SECONDS,
         "transport": target["transport"],
+        "connection": target["connection"],
         "attempts": 0,
     }, None
 
@@ -572,7 +623,7 @@ def formatted_command_group(commands):
     return "\n".join(f"  {number}. {command}" for number, command in enumerate(commands, start=1))
 
 
-def send_router_commands(state, pane, commands):
+def send_router_commands(state, pane, commands, connection=None):
     commands, error = validate_router_commands(commands)
     if error:
         return False, error
@@ -583,8 +634,10 @@ def send_router_commands(state, pane, commands):
         return False, "router recording is paused or unavailable"
     if target["transport"] not in ALLOWED_TRANSPORT_COMMANDS:
         return False, "no active tio or ssh transport in the router pane"
+    if connection is None or target["connection"] != connection:
+        return False, "the router connection changed; the command was not sent"
     try:
-        arguments = ["tmux", "-S", str(state / "tmux.sock")]
+        arguments = ["tmux", "-S", str(tmux_socket(state))]
         for number, command in enumerate(commands):
             if number:
                 arguments.append(";")
@@ -618,7 +671,8 @@ def run(engine, binary, state, pane):
             if recording is None:
                 print(localized(language, "pane_closed"), flush=True)
                 break
-            target_signature = (target["blocked"], target["recording"], target["transport"])
+            target_signature = (target["blocked"], target["recording"], target["transport"],
+                                target["connection"])
             if pending_command and previous_target is not None and target_signature != previous_target:
                 pending_command = None
                 print(localized(language, "pending_invalidated"), flush=True)
@@ -733,16 +787,20 @@ def run(engine, binary, state, pane):
                         continue
                     commands = pending_command["commands"]
                     target = router_pane_state(state, pane)
-                    if target is None or target["transport"] != pending_command["transport"]:
+                    if (target is None or target["transport"] != pending_command["transport"]
+                            or target["connection"] != pending_command["connection"]):
                         pending_command = None
                         print(localized(language, "pending_invalidated"), flush=True)
                         continue
+                    connection = pending_command["connection"]
                     pending_command = None
-                    sent, error = send_router_commands(state, pane, commands)
+                    sent, error = send_router_commands(state, pane, commands, connection)
                     if sent:
                         print(localized(language, "command_sent"), flush=True)
                     elif "paused" in error or "unavailable" in error:
                         print(localized(language, "router_unavailable"), flush=True)
+                    elif "connection changed" in error:
+                        print(localized(language, "pending_invalidated"), flush=True)
                     else:
                         print(localized(language, "command_failed", error=error), flush=True)
                 elif line == ":auto off":

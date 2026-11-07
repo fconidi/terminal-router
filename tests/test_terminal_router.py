@@ -399,6 +399,82 @@ while True:
         self.assertLess(router_output.index("TIO_RX:echo AI_CONFIG_ONE"),
                         router_output.index("TIO_RX:echo AI_CONFIG_TWO"))
 
+    def test_staged_command_is_not_sent_to_a_new_connection_of_the_same_program(self):
+        self.consent()
+        self.script("tio", 'exec -a tio bash -c \'while IFS= read -r line; do printf "TIO_RX:%s\\n" "$line"; done\'\n')
+        self.script("claude", 'cat >/dev/null\nprintf "AI_STUB_REPLY\\n"\n')
+        self.run_cmd(str(self.cli), "claude")
+        state, = (self.home / ".claude-logs").glob("workspace-*")
+        socket = str(state / "tmux.sock")
+        pane_by_role = self.workspace_panes(socket)
+        left, right = pane_by_role["router"], pane_by_role["assistant"]
+
+        def send(pane, text, enter=True):
+            self.run_cmd("tmux", "-S", socket, "send-keys", "-t", pane, "-l", text)
+            if enter:
+                self.run_cmd("tmux", "-S", socket, "send-keys", "-t", pane, "Enter")
+
+        def transport():
+            return self.run_cmd("tmux", "-S", socket, "display-message", "-p", "-t", left,
+                                "#{pane_current_command}").stdout.strip()
+
+        send(left, "tio /dev/ttyUSB0")
+        self.wait_for(lambda: transport() == "tio")
+        send(right, ":auto off")
+        send(right, ":config on")
+        self.wait_for(lambda: "configuration mode enabled" in self.run_cmd(
+            "tmux", "-S", socket, "capture-pane", "-p", "-t", right).stdout)
+        send(right, ":apply echo FOR_DEVICE_A")
+        self.wait_for(lambda: "Pending router commands:" in self.run_cmd(
+            "tmux", "-S", socket, "capture-pane", "-p", "-t", right).stdout)
+        output = self.run_cmd("tmux", "-S", socket, "capture-pane", "-p", "-t", right).stdout
+        code = re.search(r":confirm ([A-F0-9]{12})", output).group(1)
+        # Device A goes away and device B appears at once, with the same program name.
+        self.run_cmd("tmux", "-S", socket, "send-keys", "-t", left, "C-d")
+        self.wait_for(lambda: transport() != "tio")
+        send(left, "tio /dev/ttyUSB1")
+        self.wait_for(lambda: transport() == "tio")
+        send(right, f":confirm {code}")
+        self.wait_for(lambda: "router connection changed" in self.run_cmd(
+            "tmux", "-S", socket, "capture-pane", "-p", "-t", right).stdout)
+        time.sleep(0.5)
+        self.assertNotIn("TIO_RX:echo FOR_DEVICE_A", (state / "current").read_text())
+
+    def test_workspace_works_with_a_long_home(self):
+        long_home = self.base / ("h" * 50) / ("x" * 40) / "home"
+        long_home.mkdir(parents=True)
+        run_dir = self.base / "run"
+        run_dir.mkdir(mode=0o700)
+        env = dict(self.env, HOME=str(long_home), XDG_RUNTIME_DIR=str(run_dir))
+        consent = long_home / ".config/terminal-router/consent"
+        consent.parent.mkdir(parents=True)
+        consent.write_text("accepted for test\n")
+        self.script("claude", 'cat >/dev/null\nprintf "AI_STUB_REPLY\\n"\n')
+        self.run_cmd(str(self.cli), "claude", env=env)
+        state, = (long_home / ".claude-logs").glob("workspace-*")
+        self.assertGreater(len(str(state / "tmux.sock")), 100)
+        recorded = Path((state / "socket").read_text().strip())
+        self.assertLessEqual(len(str(recorded)), 100)
+        self.assertTrue(str(recorded).startswith(str(run_dir)))
+        self.assertEqual(recorded.parent.stat().st_mode & 0o777, 0o700)
+        self.addCleanup(lambda: subprocess.run(
+            [TMUX, "-S", str(recorded), "kill-server"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+        roles = self.workspace_panes(str(recorded))
+        self.assertEqual(set(roles), {"router", "assistant"})
+        panes = self.run_cmd(str(self.cli), "status", env=env).stdout
+        self.assertIn("router", panes)
+
+    def test_documentation_does_not_claim_the_observer_never_sends_commands(self):
+        for path in ("README.md", "build/usr/share/doc/terminal-router/README", "build/DEBIAN/control"):
+            text = (ROOT / path).read_text()
+            self.assertNotIn("never sends commands to the\nrouter.", text, path)
+            self.assertNotIn("never types\nor executes commands in the router pane.", text, path)
+        control = (ROOT / "build/DEBIAN/control").read_text()
+        self.assertNotIn("never sends commands\n", control)
+        self.assertIn("guarded configuration mode", control)
+        self.assertNotIn("aka edmond", control)
+
     def test_missing_requested_engine_fails_before_creating_workspace(self):
         if shutil.which("agy"):
             self.skipTest("agy is installed on this host")

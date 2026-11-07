@@ -30,7 +30,9 @@ wheel to browse up to 50,000 lines of history and Shift-drag for native text
 selection. The wheel is handled by tmux and does not enter arrow-key escape
 sequences in the assistant prompt. Only the router session is recorded; the observer follows its dedicated log link across
 pause/resume, unaffected by other sessions. It never sends commands to the
-router. Use F9/F10 to pause/resume recording even inside SSH.
+router by itself; only the optional guarded configuration mode (off by default)
+sends the commands you confirm with a one-time code, bound to the current
+connection. Use F9/F10 to pause/resume recording even inside SSH.
 
 The router pane shows serial-console hints for tio, screen and picocom. Tio is
 the recommended default. Find the adapter with:

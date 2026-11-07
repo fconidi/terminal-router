@@ -3,6 +3,27 @@
 All notable changes to this project are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.2.1] - 2026-11-07
+
+### Security
+- A command staged for confirmation is now bound to the exact `tio` or `ssh`
+  connection (process and start time) that was running when it was prepared.
+  If that connection ends and another one starts in the same pane, the group is
+  cancelled; the connection is checked again right before the keys are sent.
+  Previously only the program name was compared, so a quick switch from one
+  `tio` session to another could send the command to the new device.
+- Staging is refused when the connection cannot be identified.
+
+### Fixed
+- The workspace works with a long `HOME`: when the socket path would exceed the
+  Unix limit, a short private socket is used and recorded in the workspace.
+- README, help and package description no longer say the observer never sends
+  commands: the optional guarded configuration mode does, after a confirmation code.
+- Messages say the router *connection* changed, not only the transport.
+
+### Changed
+- Maintainer name in the package description is just Franco Conidi.
+
 ## [1.2.0] - 2026-11-03
 
 ### Added

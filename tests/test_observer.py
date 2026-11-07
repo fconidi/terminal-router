@@ -203,5 +203,79 @@ class ObserverTests(unittest.TestCase):
             self.assertIsNotNone(job.process.poll())
 
 
+class ConnectionBindingTests(unittest.TestCase):
+    PS = (
+        "  100 Ss   Fri Nov  7 19:00:01 2026 -bash\n"
+        "  200 S+   Fri Nov  7 19:00:05 2026 tio /dev/ttyUSB0\n"
+        "  201 S    Fri Nov  7 19:00:05 2026 tio-helper\n"
+    )
+
+    def run_ps(self, text, returncode=0):
+        class Result:
+            pass
+        result = Result()
+        result.stdout, result.returncode = text, returncode
+        return patch.object(observer.subprocess, "run", return_value=result)
+
+    def test_identity_is_pid_and_start_time_of_the_foreground_transport(self):
+        with self.run_ps(self.PS):
+            self.assertEqual(observer.connection_identity("/dev/pts/7", "tio"),
+                             "200:Fri Nov 7 19:00:05 2026")
+
+    def test_a_new_connection_with_the_same_program_has_a_different_identity(self):
+        other = self.PS.replace("200 S+   Fri Nov  7 19:00:05", "300 S+   Fri Nov  7 19:00:09")
+        with self.run_ps(self.PS):
+            first = observer.connection_identity("/dev/pts/7", "tio")
+        with self.run_ps(other):
+            second = observer.connection_identity("/dev/pts/7", "tio")
+        self.assertNotEqual(first, second)
+
+    def test_no_identity_without_a_foreground_transport(self):
+        with self.run_ps("  100 Ss+  Fri Nov  7 19:00:01 2026 -bash\n"):
+            self.assertIsNone(observer.connection_identity("/dev/pts/7", "tio"))
+        with self.run_ps(self.PS):
+            self.assertIsNone(observer.connection_identity("/dev/pts/7", "bash"))
+            self.assertIsNone(observer.connection_identity("", "tio"))
+        with self.run_ps("", returncode=1):
+            self.assertIsNone(observer.connection_identity("/dev/pts/7", "tio"))
+
+    def target(self, connection):
+        return {"blocked": False, "recording": True, "transport": "tio", "connection": connection}
+
+    def test_staging_requires_an_identified_connection_and_records_it(self):
+        with patch.object(observer, "router_pane_state", return_value=self.target(None)):
+            pending, failure = observer.prepare_router_commands(Path("/x"), "%1", ["show version"])
+        self.assertIsNone(pending)
+        self.assertEqual(failure[0], "transport_required")
+        with patch.object(observer, "router_pane_state", return_value=self.target("200:a")):
+            pending, failure = observer.prepare_router_commands(Path("/x"), "%1", ["show version"])
+        self.assertEqual(pending["connection"], "200:a")
+
+    def test_commands_are_not_sent_to_a_different_connection(self):
+        with patch.object(observer, "router_pane_state", return_value=self.target("300:b")), \
+                patch.object(observer.subprocess, "run") as run:
+            sent, error = observer.send_router_commands(Path("/x"), "%1", ["show version"], "200:a")
+        self.assertFalse(sent)
+        self.assertIn("connection changed", error)
+        run.assert_not_called()
+        with patch.object(observer, "router_pane_state", return_value=self.target("200:a")), \
+                patch.object(observer.subprocess, "run") as run:
+            run.return_value.returncode = 0
+            sent, error = observer.send_router_commands(Path("/x"), "%1", ["show version"], "200:a")
+        self.assertTrue(sent, error)
+        with patch.object(observer, "router_pane_state", return_value=self.target("200:a")):
+            sent, error = observer.send_router_commands(Path("/x"), "%1", ["show version"])
+        self.assertFalse(sent)
+
+    def test_socket_path_follows_the_recorded_short_socket(self):
+        with tempfile.TemporaryDirectory() as folder:
+            state = Path(folder)
+            self.assertEqual(observer.tmux_socket(state), state / "tmux.sock")
+            (state / "socket").write_text("/run/user/1000/terminal-router-1000/ab12.sock\n")
+            self.assertEqual(observer.tmux_socket(state), Path("/run/user/1000/terminal-router-1000/ab12.sock"))
+            (state / "socket").write_text("relative/path.sock\n")
+            self.assertEqual(observer.tmux_socket(state), state / "tmux.sock")
+
+
 if __name__ == "__main__":
     unittest.main()

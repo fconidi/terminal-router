@@ -1,4 +1,4 @@
-.TH TERMINAL-ROUTER 1 "November 2026" "terminal-router 1.2.0" "SysLinuxOS Manual"
+.TH TERMINAL-ROUTER 1 "November 2026" "terminal-router 1.2.1" "SysLinuxOS Manual"
 .SH NAME
 terminal\-router \- record tmux terminal sessions for AI\-assisted router work
 .SH SYNOPSIS
@@ -173,6 +173,9 @@ Enable guarded router configuration mode for this observer session. It is
 disabled by default. When the operator asks the AI to apply or type commands,
 the complete structured proposal is staged automatically for review. Up to 32
 commands can be confirmed as one ordered group. The AI cannot bypass confirmation.
+A staged group is bound to the tio or ssh connection that was running when it was
+prepared; if another connection starts, even with the same program, the group is
+cancelled and nothing is sent.
 .TP
 .B :config off
 Disable configuration mode and cancel any pending command.
@@ -187,7 +190,7 @@ After reviewing the complete ordered command group, confirm it with the displaye
 one-time code within 120 seconds. All validated commands are then sent to the
 router pane in order. New AI analyses wait while confirmation is pending. At
 most three incorrect codes are accepted. F9, a transport change or pane pause
-cancels the pending group.
+cancels the pending group. The same applies if the connection itself is replaced.
 .TP
 .B :cancel
 Discard the pending command without sending anything.

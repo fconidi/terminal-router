@@ -145,8 +145,10 @@ CLI login or configuration and use `:auto on` to retry.
 
 Captured output is sent to the chosen AI provider through your authenticated
 CLI, with normal account usage. Replies are advice: the observer never types
-or executes commands in the router pane. Pausing capture prevents new automatic
-requests; a request already sent can still finish.
+or executes commands in the router pane by itself. The only exception is the
+guarded configuration mode below, which is off by default and sends only the
+validated commands you confirm with a one-time code. Pausing capture prevents new
+automatic requests; a request already sent can still finish.
 
 ## Guarded configuration
 
@@ -156,7 +158,10 @@ the whole group is displayed, and nothing is sent until the operator enters the
 one-time confirmation code. Commands are accepted only when `tio` or `ssh` is
 the foreground transport; shell operators, control characters and newlines are
 rejected. A group expires after 120 seconds; new AI analyses wait while it is
-pending, and F9 blocks it while the router pane is paused.
+pending, and F9 blocks it while the router pane is paused. A staged group is
+bound to the specific `tio` or `ssh` connection that was running when it was
+prepared; if that connection ends and another one starts (even with the same
+program), the group is cancelled and nothing is sent.
 
 Typical flow:
 
@@ -274,8 +279,8 @@ back to more permissive execution.
 Download the packaged release and let APT install its dependencies:
 
 ```bash
-wget https://github.com/fconidi/terminal-router/releases/download/v1.2.0/terminal-router_1.2.0_all.deb
-sudo apt install ./terminal-router_1.2.0_all.deb
+wget https://github.com/fconidi/terminal-router/releases/download/v1.2.1/terminal-router_1.2.1_all.deb
+sudo apt install ./terminal-router_1.2.1_all.deb
 terminal-router
 ```
 
@@ -283,8 +288,8 @@ The release page also publishes the SHA-256 checksum. Download it beside the
 package and verify the file before installing:
 
 ```bash
-wget https://github.com/fconidi/terminal-router/releases/download/v1.2.0/terminal-router_1.2.0_all.deb.sha256
-sha256sum -c terminal-router_1.2.0_all.deb.sha256
+wget https://github.com/fconidi/terminal-router/releases/download/v1.2.1/terminal-router_1.2.1_all.deb.sha256
+sha256sum -c terminal-router_1.2.1_all.deb.sha256
 ```
 
 ### Debian / Ubuntu — build the .deb
@@ -293,7 +298,7 @@ sha256sum -c terminal-router_1.2.0_all.deb.sha256
 git clone https://github.com/fconidi/terminal-router.git
 cd terminal-router
 bash build-deb.sh
-sudo apt install ./terminal-router_1.2.0_all.deb
+sudo apt install ./terminal-router_1.2.1_all.deb
 terminal-router           # as your normal user, not root
 ```
 

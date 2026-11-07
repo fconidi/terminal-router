@@ -49,7 +49,17 @@ cmd_workspace() {
     ensure_consent || return 1
     bash "$INSTALLER" logdir-only || return $?
     state=$(mktemp -d "$LOGDIR/workspace-XXXXXXXX") || return 1
-    socket="$state/tmux.sock"
+    socket=$(workspace_socket "$state") || {
+        rmdir "$state" 2>/dev/null || true
+        die "could not create a private socket directory."
+    }
+    if [ "$socket" != "$state/tmux.sock" ]; then
+        printf '%s\n' "$socket" > "$state/socket" && chmod 600 "$state/socket" || {
+            rm -f "$state/socket"
+            rmdir "$state" 2>/dev/null || true
+            die "could not record the workspace socket."
+        }
+    fi
     router_session="router-${state##*workspace-}"
     assistant_session="assistant-${state##*workspace-}"
     router_shell="${SHELL:-/bin/sh}"
@@ -57,6 +67,7 @@ cmd_workspace() {
     router_command="printf '%s\\n' $(shell_quote "$CONNECTION_HINT"); exec $(shell_quote "$router_shell") -i"
     # In particular, ignore global logging hooks which would record the AI pane.
     left=$(tmux -S "$socket" -f /dev/null new-session -d -s "$router_session" -n router -x 96 -y 40 -P -F '#{pane_id}' "$router_command") || {
+        rm -f "$state/socket"
         rmdir "$state" 2>/dev/null || true
         die "could not create workspace."
     }

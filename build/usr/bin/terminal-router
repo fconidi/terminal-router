@@ -9,7 +9,7 @@
 
 set -uo pipefail
 
-VERSION="1.2.0"
+VERSION="1.2.1"
 INSTALLER="/usr/share/terminal-router/install.sh"
 CONSENT="$HOME/.config/terminal-router/consent"
 source /usr/share/terminal-router/common.sh || exit 1
@@ -225,8 +225,10 @@ cmd_remove() {
 }
 
 workspace_panes() {
-    local socket
-    for socket in "$LOGDIR"/workspace-*/tmux.sock; do
+    local socket state
+    for state in "$LOGDIR"/workspace-*; do
+        [ -d "$state" ] || continue
+        socket=$(workspace_socket_of "$state")
         [ -S "$socket" ] || continue
         tmux -S "$socket" list-panes -a -F '  #{session_name}:#{window_index}.#{pane_index} (#{pane_id}) #{@terminal_router_role} pipe=#{pane_pipe}' 2>/dev/null || true
     done

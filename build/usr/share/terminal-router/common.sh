@@ -53,3 +53,32 @@ update_block() {
     fi
     rm -f "$tmp"
 }
+
+# A Unix socket path is limited to about 107 bytes. With a long HOME the
+# workspace socket would not fit next to its logs, so a short private
+# directory is used instead and its path is recorded in "$state/socket".
+workspace_socket() {
+    local state="$1" id dir
+    local LC_ALL=C
+    if [ "${#state}" -le 90 ]; then
+        printf '%s/tmux.sock' "$state"
+        return 0
+    fi
+    id="${state##*/workspace-}"
+    dir="${XDG_RUNTIME_DIR:-/tmp}/terminal-router-$(id -u)"
+    mkdir -p -m 700 "$dir" 2>/dev/null || return 1
+    # Never trust a directory that is not ours or is open to others.
+    [ -d "$dir" ] && [ -O "$dir" ] && [ ! -L "$dir" ] || return 1
+    chmod 700 "$dir" 2>/dev/null || return 1
+    printf '%s/%s.sock' "$dir" "$id"
+}
+
+# Socket of an existing workspace state directory.
+workspace_socket_of() {
+    local state="$1" path
+    if [ -f "$state/socket" ] && [ ! -L "$state/socket" ]; then
+        path=$(head -n 1 "$state/socket")
+        case "$path" in /*) printf '%s' "$path"; return 0 ;; esac
+    fi
+    printf '%s/tmux.sock' "$state"
+}

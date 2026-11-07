@@ -1,3 +1,12 @@
+terminal-router (1.2.1) tirreno; urgency=medium
+
+  * Bind a staged router command group to the exact tio/ssh connection and
+    re-check it before sending; cancel it when another connection starts.
+  * Use a short private socket when the workspace path is too long.
+  * Correct the documentation about when the observer can send commands.
+
+ -- Franco Conidi <fconidi@gmail.com>  Sat, 07 Nov 2026 19:50:00 +0100
+
 terminal-router (1.2.0) tirreno; urgency=medium
 
   * Add Antigravity CLI (agy) as a router observer with strict tool denial.
